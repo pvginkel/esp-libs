@@ -43,8 +43,7 @@ float scaleLightLevel(float level, float minimumLevel, float maximumLevel) {
     return level;
 }
 
-template <class InterpolateAlgorithm>
-void Light<InterpolateAlgorithm>::reconfigure(float minimumLevel, float maximumLevel, uint32_t time) {
+void LightBase::reconfigure(float minimumLevel, float maximumLevel, uint32_t time) {
     auto level = getLevel();
 
     _minimumLevel = minimumLevel;
@@ -53,23 +52,10 @@ void Light<InterpolateAlgorithm>::reconfigure(float minimumLevel, float maximumL
     setLevel(level, time);
 }
 
-template <class InterpolateAlgorithm>
-void Light<InterpolateAlgorithm>::begin(uint8_t pin) {
-    _pin = pin;
+void LightBase::begin() { resetTransition(); }
 
-    gpio_config_t i_conf = {
-        .pin_bit_mask = 1ull << pin,
-        .mode = GPIO_MODE_OUTPUT,
-    };
-
-    ESP_ERROR_CHECK(gpio_config(&i_conf));
-
-    resetTransition();
-}
-
-template <class InterpolateAlgorithm>
-void Light<InterpolateAlgorithm>::update() {
-    if (_pin == -1 || !_transitionStart) {
+void LightBase::update() {
+    if (!_transitionStart) {
         return;
     }
 
@@ -88,12 +74,11 @@ void Light<InterpolateAlgorithm>::update() {
         _actualLevel = level;
         _lastUpdate = currentMillis;
 
-        updatePinValue();
+        updateDutyCycle();
     }
 }
 
-template <class InterpolateAlgorithm>
-void Light<InterpolateAlgorithm>::setLevel(float level, uint32_t time) {
+void LightBase::setLevel(float level, uint32_t time) {
     if (level < 0.0f) {
         level = 0.0f;
     }
@@ -116,8 +101,7 @@ void Light<InterpolateAlgorithm>::setLevel(float level, uint32_t time) {
     _levelChanged.call(_level);
 }
 
-template <class InterpolateAlgorithm>
-void Light<InterpolateAlgorithm>::resetTransition() {
+void LightBase::resetTransition() {
     auto scaledLevel = getScaledLevel();
 
     _startLevel = scaledLevel;
@@ -127,29 +111,15 @@ void Light<InterpolateAlgorithm>::resetTransition() {
     _actualLevel = scaledLevel;
     _lastUpdate = esp_timer_get_time() / 1000;
 
-    updatePinValue();
+    updateDutyCycle();
 }
 
-template <class InterpolateAlgorithm>
-void Light<InterpolateAlgorithm>::updatePinValue() {
-    auto realValue = interpolate(_actualLevel);
+void LightBase::updateDutyCycle() {
+    const auto realValue = interpolate(_actualLevel);
 
-    ESP_LOGD(TAG, "Setting light pin to %f scaled level %f", realValue, _actualLevel);
+    ESP_LOGD(TAG, "Setting light pin to %f duty cycle %f", _actualLevel, realValue);
 
-    ESP_ERROR_CHECK(gpio_set_level(_pin, realValue));
-}
-
-template <class InterpolateAlgorithm>
-uint8_t Light<InterpolateAlgorithm>::interpolate(float level) {
-    const auto result = int(InterpolateAlgorithm::interpolate(level) * 256.0f);
-
-    if (result < 0) {
-        return 0;
-    }
-    if (result > 255) {
-        return 255;
-    }
-    return uint8_t(result);
+    _dutyCycleChanged.call(realValue);
 }
 
 float CIE1931InterpolateAlgorithm::interpolate(float level) {

@@ -1,0 +1,8 @@
+version: "0.1.0"
+description: Support libraries for the ESP32
+url: https://github.com/pvginkel/esp-zha-libs
+dependencies:
+  idf: ">=5.3"
+files:
+  exclude:
+    - ".github"

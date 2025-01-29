@@ -25,18 +25,20 @@ public:
         setLevel(level, time);
     }
 
-    void begin(uint8_t lowColdPin, uint8_t lowWarmPin, uint8_t highColdPin, uint8_t highWarmPin) {
-        _low->begin(lowColdPin, lowWarmPin);
-        _high->begin(highColdPin, highWarmPin);
+    void begin() {
+        _low->begin();
+        _high->begin();
     }
 
     bool isOn() const { return _level > 0; }
     float getLevel() const { return _level; }
     uint16_t getTemperature() const { return _low->getTemperature(); }
-    void onLevelChanged(CallbackArgs<float>::Func func, uintptr_t data = 0) { _levelChanged.set(func, data); }
-    void onTemperatureChanged(CallbackArgs<uint16_t>::Func func, uintptr_t data = 0) {
-        _temperatureChanged.set(func, data);
-    }
+    void onLevelChanged(std::function<void(float)> func) { _levelChanged.add(func); }
+    void onTemperatureChanged(std::function<void(uint16_t)> func) { _temperatureChanged.add(func); }
+    void onHighWarmDutyCycleChanged(std::function<void(float)> func) { _high->onWarmDutyCycleChanged(func); }
+    void onHighColdDutyCycleChanged(std::function<void(float)> func) { _high->onColdDutyCycleChanged(func); }
+    void onLowWarmDutyCycleChanged(std::function<void(float)> func) { _low->onWarmDutyCycleChanged(func); }
+    void onLowColdDutyCycleChanged(std::function<void(float)> func) { _low->onColdDutyCycleChanged(func); }
 
     void update() {
         _low->update();
