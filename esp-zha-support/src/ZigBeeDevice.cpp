@@ -6,7 +6,7 @@
 
 LOG_TAG(ZigBeeDevice);
 
-static constexpr uint32_t ZB_MAIN_TASK_STACK_SIZE = 4096;
+static constexpr uint32_t ZB_MAIN_TASK_STACK_SIZE = 6192;
 
 static ZigBeeDevice *APP_INSTANCE = nullptr;
 
@@ -101,7 +101,7 @@ esp_err_t ZigBeeDevice::begin(esp_zb_cfg_t *zb_cfg, bool erase_nvs) {
     }
 
     // Create ZigBee task and start ZigBee stack
-    xTaskCreate([](void *pvParameters) { ((ZigBeeDevice *)pvParameters)->esp_zb_task(); }, "ZigBee_main",
+    xTaskCreate([](void *pvParameters) { ((ZigBeeDevice *)pvParameters)->zbTask(); }, "ZigBee_main",
                 ZB_MAIN_TASK_STACK_SIZE, this, 5, NULL);
 
     return true;
@@ -112,7 +112,7 @@ void ZigBeeDevice::addEndpoint(ZigBeeEndpoint *ep) {
 
     ep->begin();
 
-    esp_zb_ep_list_add_ep(_zb_ep_list, ep->_cluster_list, ep->_endpoint_config);
+    ESP_ERROR_CHECK(esp_zb_ep_list_add_ep(_zb_ep_list, ep->_cluster_list, ep->_endpoint_config));
 }
 
 void ZigBeeDevice::startupComplete() {
@@ -120,7 +120,20 @@ void ZigBeeDevice::startupComplete() {
     _started_cb.call();
 }
 
-void ZigBeeDevice::esp_zb_task() {
+void ZigBeeDevice::zbTask() {
+#if CONFIG_ZB_DEBUG_MODE
+    // esp_zb_set_trace_level_mask(ESP_ZB_TRACE_LEVEL_DEBUG,
+    //                             ESP_ZB_TRACE_SUBSYSTEM_APP | ESP_ZB_TRACE_SUBSYSTEM_ZCL |
+    //                             ESP_ZB_TRACE_SUBSYSTEM_ZDO);
+#endif
+
+    for (const auto ep : _ep_objects) {
+        auto const endpoint = zb_af_get_endpoint_desc(ep->_endpoint_config.endpoint);
+
+        ep->_original_device_handler = endpoint->device_handler;
+        endpoint->device_handler = [](zb_uint8_t param) { return APP_INSTANCE->zbDeviceHandler(param); };
+    }
+
     esp_zb_bdb_set_scan_duration(_scan_duration);
 
     /* initialize ZigBee stack */
@@ -163,11 +176,9 @@ static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask) {
     ESP_ERROR_CHECK(esp_zb_bdb_start_top_level_commissioning(mode_mask));
 }
 
-void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
-    APP_INSTANCE->zb_app_signal_handler(signal_struct);
-}
+void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) { APP_INSTANCE->zbSignalHandler(signal_struct); }
 
-void ZigBeeDevice::zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
+void ZigBeeDevice::zbSignalHandler(esp_zb_app_signal_t *signal_struct) {
     // common variables
     uint32_t *p_sg_p = signal_struct->p_app_signal;
     esp_err_t err_status = signal_struct->esp_err_status;
@@ -338,6 +349,29 @@ void ZigBeeDevice::zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
     }
 }
 
+uint8_t ZigBeeDevice::zbDeviceHandler(uint8_t param) {
+    zb_zcl_parsed_hdr_t cmd_info;
+    ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
+
+    const auto dst_endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
+
+    for (const auto ep : _ep_objects) {
+        if (ep->_endpoint_config.endpoint == dst_endpoint) {
+            ESP_ERROR_CHECK(ep->prefilterCommand(param));
+
+            if (ep->_original_device_handler) {
+                return ep->_original_device_handler(param);
+            } else {
+                return 1;
+            }
+        }
+    }
+
+    ESP_LOGE(TAG, "Didn't find an endpoint");
+
+    return 1;
+}
+
 void ZigBeeDevice::factoryReset() {
     ESP_LOGI(TAG, "Factory resetting ZigBee stack, device will reboot");
 
@@ -505,11 +539,11 @@ esp_err_t ZigBeeDevice::zbAttributeSetHandler(const esp_zb_zcl_set_attr_value_me
         return ESP_FAIL;
     }
     if (message->info.status != ESP_ZB_ZCL_STATUS_SUCCESS) {
-        ESP_LOGE(TAG, "Received message: error status(%d)", message->info.status);
+        ESP_LOGE(TAG, "Received attribute set: error status(%d)", message->info.status);
         return ESP_ERR_INVALID_ARG;
     }
 
-    ESP_LOGD(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d)",
+    ESP_LOGD(TAG, "Received attribute set: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d)",
              message->info.dst_endpoint, message->info.cluster, message->attribute.id, message->attribute.data.size);
 
     // List through all ZigBee EPs and call the callback function, with the message
@@ -531,10 +565,10 @@ esp_err_t ZigBeeDevice::zbAttributeReportingHandler(const esp_zb_zcl_report_attr
         return ESP_FAIL;
     }
     if (message->status != ESP_ZB_ZCL_STATUS_SUCCESS) {
-        ESP_LOGE(TAG, "Received message: error status(%d)", message->status);
+        ESP_LOGE(TAG, "Received attribute report: error status(%d)", message->status);
         return ESP_ERR_INVALID_ARG;
     }
-    ESP_LOGD(TAG, "Received report from address(0x%x) src endpoint(%d) to dst endpoint(%d) cluster(0x%x)",
+    ESP_LOGD(TAG, "Received attribute report from address(0x%x) src endpoint(%d) to dst endpoint(%d) cluster(0x%x)",
              message->src_address.u.short_addr, message->src_endpoint, message->dst_endpoint, message->cluster);
     // List through all ZigBee EPs and call the callback function, with the message
     for (const auto ep_object : _ep_objects) {
@@ -551,7 +585,7 @@ esp_err_t ZigBeeDevice::zbCommandReadAttributeResponseHandler(const esp_zb_zcl_c
         return ESP_FAIL;
     }
     if (message->info.status != ESP_ZB_ZCL_STATUS_SUCCESS) {
-        ESP_LOGE(TAG, "Received message: error status(%d)", message->info.status);
+        ESP_LOGE(TAG, "Received attribute response: error status(%d)", message->info.status);
         return ESP_ERR_INVALID_ARG;
     }
     ESP_LOGD(TAG, "Read attribute response: from address(0x%x) src endpoint(%d) to dst endpoint(%d) cluster(0x%x)",
@@ -583,12 +617,12 @@ esp_err_t ZigBeeDevice::zbConfigureReportingResponseHandler(
         return ESP_FAIL;
     }
     if (message->info.status != ESP_ZB_ZCL_STATUS_SUCCESS) {
-        ESP_LOGE(TAG, "Received message: error status(%d)", message->info.status);
+        ESP_LOGE(TAG, "Received configure report response: error status(%d)", message->info.status);
         return ESP_ERR_INVALID_ARG;
     }
 
     for (auto variable = message->variables; variable; variable = variable->next) {
-        ESP_LOGD(TAG, "Configure report response: status(%d), cluster(0x%x), direction(0x%x), attribute(0x%x)",
+        ESP_LOGD(TAG, "Received configure report response: status(%d), cluster(0x%x), direction(0x%x), attribute(0x%x)",
                  variable->status, message->info.cluster, variable->direction, variable->attribute_id);
     }
 

@@ -83,8 +83,9 @@ class ZigBeeDevice {
     esp_err_t zbCommandReadAttributeResponseHandler(const esp_zb_zcl_cmd_read_attr_resp_message_t *message);
     esp_err_t zbConfigureReportingResponseHandler(const esp_zb_zcl_cmd_config_report_resp_message_t *message);
     esp_err_t zbCommandDefaultResponseHandler(const esp_zb_zcl_cmd_default_resp_message_t *message);
-    void esp_zb_task();
-    void zb_app_signal_handler(esp_zb_app_signal_t *signal_struct);
+    void zbTask();
+    void zbSignalHandler(esp_zb_app_signal_t *signal_struct);
+    uint8_t zbDeviceHandler(uint8_t param);
 
 public:
     ZigBeeDevice();

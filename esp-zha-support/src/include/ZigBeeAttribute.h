@@ -33,7 +33,8 @@ public:
     ZigBeeAttributeBool(uint8_t endpoint_id, uint16_t cluster_id, uint16_t attribute_id)
         : ZigBeeAttribute(endpoint_id, cluster_id, attribute_id) {}
 
-    bool get() { return *(bool*)raw_get()->data_p; }
+    bool get();
+    bool get(bool default_value);
     void set(bool value) { raw_set(&value); }
     void on_changed(std::function<void(bool)> func) { _changed.add(func); }
 
@@ -50,7 +51,8 @@ public:
     ZigBeeAttributeU8(uint8_t endpoint_id, uint16_t cluster_id, uint16_t attribute_id)
         : ZigBeeAttribute(endpoint_id, cluster_id, attribute_id) {}
 
-    uint8_t get() { return *(uint8_t*)raw_get()->data_p; }
+    uint8_t get();
+    uint8_t get(uint8_t default_value);
     void set(uint8_t value) { raw_set(&value); }
     void on_changed(std::function<void(uint8_t)> func) { _changed.add(func); }
 
@@ -61,13 +63,14 @@ protected:
 };
 
 class ZigBeeAttributeU16 : public ZigBeeAttribute {
-    Callback<uint8_t> _changed;
+    Callback<uint16_t> _changed;
 
 public:
     ZigBeeAttributeU16(uint8_t endpoint_id, uint16_t cluster_id, uint16_t attribute_id)
         : ZigBeeAttribute(endpoint_id, cluster_id, attribute_id) {}
 
-    uint16_t get() { return *(uint16_t*)raw_get()->data_p; }
+    uint16_t get();
+    uint16_t get(uint16_t default_value);
     void set(uint16_t value) { raw_set(&value); }
     void on_changed(std::function<void(uint16_t)> func) { _changed.add(func); }
 

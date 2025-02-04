@@ -63,6 +63,23 @@ void ZigBeeEndpoint::setBatteryPercentage(uint8_t percentage) {
     ESP_LOGD(TAG, "Battery percentage updated");
 }
 
+ZigBeeCommandBuilder &ZigBeeEndpoint::createCoordinatorCommand() {
+    return ZigBeeCommandBuilder()
+        .withSourceEndpoint(getEndpoint())
+        .withDestinationEndpoint(1)
+        .withDestinationAddress({.addr_short = 0} /* Coordinator */)
+        .withAddressMode(ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT)
+        .withProfileId(ESP_ZB_AF_HA_PROFILE_ID)
+        .withDirection(ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV);
+}
+
+void ZigBeeEndpoint::addClusterHandlerFilter(zb_uint16_t cluster_id, zb_uint8_t cluster_role,
+                                             std::function<zb_bool_t(zb_uint8_t, zb_zcl_cluster_handler_t)> func) {
+    const auto current_cluster_handler = zb_zcl_get_cluster_handler(cluster_id, cluster_role);
+    const auto current_cluster_check_value = zb_zcl_get_cluster_check_value(cluster_id, cluster_role);
+    const auto current_cluster_write_attr_hook = zb_zcl_get_cluster_write_attr_hook(cluster_id, cluster_role);
+}
+
 void ZigBeeEndpoint::printBoundDevices() {
     ESP_LOGI(TAG, "Bound devices:");
     for (const auto &device : _bound_devices) {
@@ -71,6 +88,14 @@ void ZigBeeEndpoint::printBoundDevices() {
                  device->endpoint, device->short_addr, device->ieee_addr[7], device->ieee_addr[6], device->ieee_addr[5],
                  device->ieee_addr[4], device->ieee_addr[3], device->ieee_addr[2], device->ieee_addr[1],
                  device->ieee_addr[0]);
+    }
+}
+
+void ZigBeeEndpoint::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) {
+    for (auto attribute : _attributes) {
+        if (attribute->_cluster_id == message->info.cluster && attribute->_attribute_id == message->attribute.id) {
+            attribute->raise_changed(message);
+        }
     }
 }
 

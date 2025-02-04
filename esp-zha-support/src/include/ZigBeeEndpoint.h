@@ -2,18 +2,21 @@
 
 #include "Callback.h"
 #include "ZigBeeAttribute.h"
+#include "ZigBeeCommandBuilder.h"
 #include "ZigBeeDevice.h"
 #include "esp_zigbee_core.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "zboss_api.h"
+#include "zcl/zb_zcl_common.h"
+#ifdef __cplusplus
+};
+#endif
+
 /* Useful defines */
 #define ZB_CMD_TIMEOUT 10000  // 10 seconds
-
-#define ZB_ARRAY_LENTH(arr) (sizeof(arr) / sizeof(arr[0]))
-
-typedef struct zbstring_s {
-    uint8_t len;
-    char data[];
-} ESP_ZB_PACKED_STRUCT zbstring_t;
 
 typedef struct zb_device_params_s {
     esp_zb_ieee_addr_t ieee_addr;
@@ -36,6 +39,7 @@ class ZigBeeEndpoint {
     std::vector<zb_device_params_t *> _bound_devices;
     std::vector<ZigBeeAttribute *> _attributes;
     ZigBeeAttributeU8 *_battery_percentage_remaining;
+    zb_device_handler_t _original_device_handler{};
 
 public:
     ZigBeeEndpoint(esp_zb_endpoint_config_t endpoint_config) : _endpoint_config(endpoint_config) {}
@@ -45,15 +49,20 @@ public:
     void printBoundDevices();
     void setBatteryPercentage(uint8_t percentage);
     void onIdentify(std::function<void(uint16_t)> func) { _identify.add(func); }
+    ZigBeeCommandBuilder &createCoordinatorCommand();
 
 protected:
     virtual zb_endpoint_cluster_t buildCluster() = 0;
+    virtual esp_err_t prefilterCommand(uint8_t param) { return ESP_OK; }
+
+    void addClusterHandlerFilter(zb_uint16_t cluster_id, zb_uint8_t cluster_role,
+                                 std::function<zb_bool_t(zb_uint8_t, zb_zcl_cluster_handler_t)> func);
 
     // findEndpoint may be implemented by EPs to find and bind devices
     virtual void findEndpoint(esp_zb_zdo_match_desc_req_param_t *cmd_req) {};
 
     // list of all handlers function calls, to be override by EPs implementation
-    virtual void zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) {};
+    virtual void zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message);
     virtual void zbAttributeRead(uint16_t cluster_id, const esp_zb_zcl_attribute_t *attribute) {};
     virtual void zbIdentify(const esp_zb_zcl_set_attr_value_message_t *message);
 
