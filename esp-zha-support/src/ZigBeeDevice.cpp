@@ -357,7 +357,9 @@ uint8_t ZigBeeDevice::zbDeviceHandler(uint8_t param) {
 
     for (const auto ep : _ep_objects) {
         if (ep->_endpoint_config.endpoint == dst_endpoint) {
-            ESP_ERROR_CHECK(ep->prefilterCommand(param));
+            for (const auto command_filter : ep->_command_filters) {
+                ESP_ERROR_CHECK(command_filter->prefilterCommand(param));
+            }
 
             if (ep->_original_device_handler) {
                 return ep->_original_device_handler(param);

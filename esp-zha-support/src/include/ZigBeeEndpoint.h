@@ -3,6 +3,7 @@
 #include "Callback.h"
 #include "ZigBeeAttribute.h"
 #include "ZigBeeCommandBuilder.h"
+#include "ZigBeeCommandFilter.h"
 #include "ZigBeeDevice.h"
 #include "esp_zigbee_core.h"
 
@@ -40,6 +41,7 @@ class ZigBeeEndpoint {
     std::vector<ZigBeeAttribute *> _attributes;
     ZigBeeAttributeU8 *_battery_percentage_remaining;
     zb_device_handler_t _original_device_handler{};
+    std::vector<ZigBeeCommandFilter *> _command_filters;
 
 public:
     ZigBeeEndpoint(esp_zb_endpoint_config_t endpoint_config) : _endpoint_config(endpoint_config) {}
@@ -50,10 +52,10 @@ public:
     void setBatteryPercentage(uint8_t percentage);
     void onIdentify(std::function<void(uint16_t)> func) { _identify.add(func); }
     ZigBeeCommandBuilder &createCoordinatorCommand();
+    void addCommandFilter(ZigBeeCommandFilter *command_filter) { _command_filters.push_back(command_filter); }
 
 protected:
     virtual zb_endpoint_cluster_t buildCluster() = 0;
-    virtual esp_err_t prefilterCommand(uint8_t param) { return ESP_OK; }
 
     void addClusterHandlerFilter(zb_uint16_t cluster_id, zb_uint8_t cluster_role,
                                  std::function<zb_bool_t(zb_uint8_t, zb_zcl_cluster_handler_t)> func);
