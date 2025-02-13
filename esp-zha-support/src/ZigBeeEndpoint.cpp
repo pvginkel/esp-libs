@@ -94,7 +94,7 @@ void ZigBeeEndpoint::printBoundDevices() {
 void ZigBeeEndpoint::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) {
     for (auto attribute : _attributes) {
         if (attribute->_cluster_id == message->info.cluster && attribute->_attribute_id == message->attribute.id) {
-            attribute->raise_changed(message);
+            attribute->raiseChanged(message);
         }
     }
 }

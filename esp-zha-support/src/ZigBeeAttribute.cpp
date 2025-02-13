@@ -25,7 +25,7 @@ void ZigBeeAttribute::report() {
     esp_zb_zcl_report_attr_cmd_req(&report_attr_cmd);
 }
 
-esp_zb_zcl_attr_t* ZigBeeAttribute::raw_get() {
+esp_zb_zcl_attr_t* ZigBeeAttribute::doGet() {
     ZigBeeLock lock;
 
     const auto attr =
@@ -37,7 +37,7 @@ esp_zb_zcl_attr_t* ZigBeeAttribute::raw_get() {
     return attr;
 }
 
-void ZigBeeAttribute::raw_set(void* buffer) {
+void ZigBeeAttribute::doSet(void* buffer) {
     ZigBeeLock lock;
 
     ESP_ZB_ERROR_CHECK(esp_zb_zcl_set_attribute_val(_endpoint_id, _cluster_id, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
@@ -45,34 +45,34 @@ void ZigBeeAttribute::raw_set(void* buffer) {
 }
 
 bool ZigBeeAttributeBool::get() {
-    const auto data_p = (bool*)raw_get()->data_p;
+    const auto data_p = (bool*)doGet()->data_p;
     ESP_ERROR_ASSERT(data_p);
     return *data_p;
 }
 
 bool ZigBeeAttributeBool::get(bool default_value) {
-    const auto data_p = (bool*)raw_get()->data_p;
+    const auto data_p = (bool*)doGet()->data_p;
     return data_p ? *data_p : default_value;
 }
 
 uint8_t ZigBeeAttributeU8::get() {
-    const auto data_p = (uint8_t*)raw_get()->data_p;
+    const auto data_p = (uint8_t*)doGet()->data_p;
     ESP_ERROR_ASSERT(data_p);
     return *data_p;
 }
 
 uint8_t ZigBeeAttributeU8::get(uint8_t default_value) {
-    const auto data_p = (uint8_t*)raw_get()->data_p;
+    const auto data_p = (uint8_t*)doGet()->data_p;
     return data_p ? *data_p : default_value;
 }
 
 uint16_t ZigBeeAttributeU16::get() {
-    const auto data_p = (uint16_t*)raw_get()->data_p;
+    const auto data_p = (uint16_t*)doGet()->data_p;
     ESP_ERROR_ASSERT(data_p);
     return *data_p;
 }
 
 uint16_t ZigBeeAttributeU16::get(uint16_t default_value) {
-    const auto data_p = (uint16_t*)raw_get()->data_p;
+    const auto data_p = (uint16_t*)doGet()->data_p;
     return data_p ? *data_p : default_value;
 }
