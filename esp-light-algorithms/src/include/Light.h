@@ -2,6 +2,10 @@
 
 #include "Callback.h"
 
+#define LEVEL_MAX (254)
+#define LEVEL_FROM_ZB(value) (float(value) / float(LEVEL_MAX))
+#define LEVEL_TO_ZB(value) (uint8_t((value) * float(LEVEL_MAX)))
+
 // Taken from https://blog.saikoled.com/post/43693602826/why-every-led-light-should-be-using-hsi.
 //
 // Function example takes H, S, I, and a pointer to the

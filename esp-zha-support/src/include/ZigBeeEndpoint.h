@@ -57,9 +57,6 @@ public:
 protected:
     virtual zb_endpoint_cluster_t buildCluster() = 0;
 
-    void addClusterHandlerFilter(zb_uint16_t cluster_id, zb_uint8_t cluster_role,
-                                 std::function<zb_bool_t(zb_uint8_t, zb_zcl_cluster_handler_t)> func);
-
     // findEndpoint may be implemented by EPs to find and bind devices
     virtual void findEndpoint(esp_zb_zdo_match_desc_req_param_t *cmd_req) {};
 

@@ -69,13 +69,6 @@ ZigBeeCommandBuilder ZigBeeEndpoint::createCoordinatorCommand() {
         .withDirection(ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV);
 }
 
-void ZigBeeEndpoint::addClusterHandlerFilter(zb_uint16_t cluster_id, zb_uint8_t cluster_role,
-                                             std::function<zb_bool_t(zb_uint8_t, zb_zcl_cluster_handler_t)> func) {
-    const auto current_cluster_handler = zb_zcl_get_cluster_handler(cluster_id, cluster_role);
-    const auto current_cluster_check_value = zb_zcl_get_cluster_check_value(cluster_id, cluster_role);
-    const auto current_cluster_write_attr_hook = zb_zcl_get_cluster_write_attr_hook(cluster_id, cluster_role);
-}
-
 void ZigBeeEndpoint::printBoundDevices() {
     ESP_LOGI(TAG, "Bound devices:");
     for (const auto &device : _bound_devices) {
