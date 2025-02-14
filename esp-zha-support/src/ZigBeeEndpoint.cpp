@@ -63,7 +63,7 @@ void ZigBeeEndpoint::setBatteryPercentage(uint8_t percentage) {
     ESP_LOGD(TAG, "Battery percentage updated");
 }
 
-ZigBeeCommandBuilder &ZigBeeEndpoint::createCoordinatorCommand() {
+ZigBeeCommandBuilder ZigBeeEndpoint::createCoordinatorCommand() {
     return ZigBeeCommandBuilder()
         .withSourceEndpoint(getEndpoint())
         .withDestinationEndpoint(1)

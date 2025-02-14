@@ -51,7 +51,7 @@ public:
     void printBoundDevices();
     void setBatteryPercentage(uint8_t percentage);
     void onIdentify(std::function<void(uint16_t)> func) { _identify.add(func); }
-    ZigBeeCommandBuilder &createCoordinatorCommand();
+    ZigBeeCommandBuilder createCoordinatorCommand();
     void addCommandFilter(ZigBeeCommandFilter *command_filter) { _command_filters.push_back(command_filter); }
 
 protected:

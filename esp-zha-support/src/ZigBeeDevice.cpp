@@ -122,7 +122,7 @@ void ZigBeeDevice::startupComplete() {
 
 void ZigBeeDevice::zbTask() {
 #if CONFIG_ZB_DEBUG_MODE
-    // esp_zb_set_trace_level_mask(ESP_ZB_TRACE_LEVEL_DEBUG,
+    // esp_zb_set_trace_level_mask(ESP_ZB_TRACE_LEVEL_INFO,
     //                             ESP_ZB_TRACE_SUBSYSTEM_APP | ESP_ZB_TRACE_SUBSYSTEM_ZCL |
     //                             ESP_ZB_TRACE_SUBSYSTEM_ZDO);
 #endif
@@ -358,7 +358,11 @@ uint8_t ZigBeeDevice::zbDeviceHandler(uint8_t param) {
     for (const auto ep : _ep_objects) {
         if (ep->_endpoint_config.endpoint == dst_endpoint) {
             for (const auto command_filter : ep->_command_filters) {
-                ESP_ERROR_CHECK(command_filter->prefilterCommand(param));
+                if (cmd_info.is_common_command) {
+                    ESP_ERROR_CHECK(command_filter->prefilterCommonCommand(param));
+                } else {
+                    ESP_ERROR_CHECK(command_filter->prefilterSpecificCommand(param));
+                }
             }
 
             if (ep->_original_device_handler) {

@@ -16,6 +16,8 @@ extern "C" {
 };
 #endif
 
+LOG_TAG(ZigBeeCommandFilter);
+
 #define EXTRACT_TRANSITION_TIME(type)                \
     {                                                \
         const auto req = (type*)zb_buf_begin(param); \
@@ -24,7 +26,7 @@ extern "C" {
         break;                                       \
     }
 
-esp_err_t ZigBeeTransitionTimeCommandFilter::prefilterCommand(uint8_t param) {
+esp_err_t ZigBeeTransitionTimeCommandFilter::prefilterSpecificCommand(uint8_t param) {
     zb_zcl_parsed_hdr_t cmd_info;
     ZB_ZCL_COPY_PARSED_HEADER(param, &cmd_info);
 
