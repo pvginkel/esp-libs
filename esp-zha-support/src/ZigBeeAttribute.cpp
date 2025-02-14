@@ -44,17 +44,6 @@ void ZigBeeAttribute::doSet(void* buffer) {
                                                     _attribute_id, buffer, false));
 }
 
-bool ZigBeeAttributeBool::get() {
-    const auto data_p = (bool*)doGet()->data_p;
-    ESP_ERROR_ASSERT(data_p);
-    return *data_p;
-}
-
-bool ZigBeeAttributeBool::get(bool default_value) {
-    const auto data_p = (bool*)doGet()->data_p;
-    return data_p ? *data_p : default_value;
-}
-
 uint8_t ZigBeeAttributeU8::get() {
     const auto data_p = (uint8_t*)doGet()->data_p;
     ESP_ERROR_ASSERT(data_p);

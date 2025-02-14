@@ -68,9 +68,10 @@ protected:
     virtual void zbAttributeRead(uint16_t cluster_id, const esp_zb_zcl_attribute_t *attribute) {};
     virtual void zbIdentify(const esp_zb_zcl_set_attr_value_message_t *message);
 
-    ZigBeeAttributeBool *createAttributeBool(uint16_t cluster_id, uint16_t attribute_id);
-    ZigBeeAttributeU8 *createAttributeU8(uint16_t cluster_id, uint16_t attribute_id);
-    ZigBeeAttributeU16 *createAttributeU16(uint16_t cluster_id, uint16_t attribute_id);
+    ZigBeeAttributeU8 *createAttributeU8(uint16_t cluster_id, uint16_t attribute_id,
+                                         esp_zb_zcl_attr_type_t attr_type = ESP_ZB_ZCL_ATTR_TYPE_U8);
+    ZigBeeAttributeU16 *createAttributeU16(uint16_t cluster_id, uint16_t attribute_id,
+                                           esp_zb_zcl_attr_type_t attr_type = ESP_ZB_ZCL_ATTR_TYPE_U16);
 
 private:
     void begin();

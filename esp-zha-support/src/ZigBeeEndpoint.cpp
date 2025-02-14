@@ -30,19 +30,15 @@ void ZigBeeEndpoint::begin() {
     }
 }
 
-ZigBeeAttributeBool *ZigBeeEndpoint::createAttributeBool(uint16_t cluster_id, uint16_t attribute_id) {
-    const auto attribute = new ZigBeeAttributeBool(getEndpoint(), cluster_id, attribute_id);
-    _attributes.push_back(attribute);
-    return attribute;
-}
-
-ZigBeeAttributeU8 *ZigBeeEndpoint::createAttributeU8(uint16_t cluster_id, uint16_t attribute_id) {
+ZigBeeAttributeU8 *ZigBeeEndpoint::createAttributeU8(uint16_t cluster_id, uint16_t attribute_id,
+                                                     esp_zb_zcl_attr_type_t attr_type) {
     const auto attribute = new ZigBeeAttributeU8(getEndpoint(), cluster_id, attribute_id);
     _attributes.push_back(attribute);
     return attribute;
 }
 
-ZigBeeAttributeU16 *ZigBeeEndpoint::createAttributeU16(uint16_t cluster_id, uint16_t attribute_id) {
+ZigBeeAttributeU16 *ZigBeeEndpoint::createAttributeU16(uint16_t cluster_id, uint16_t attribute_id,
+                                                       esp_zb_zcl_attr_type_t attr_type) {
     const auto attribute = new ZigBeeAttributeU16(getEndpoint(), cluster_id, attribute_id);
     _attributes.push_back(attribute);
     return attribute;
