@@ -101,6 +101,8 @@ void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventI
 }
 
 void NetworkConnection::setup_sntp() {
+#if CONFIG_ENABLE_SNTP
+
     ESP_LOGI(TAG, "Initializing SNTP");
 
     esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
@@ -121,4 +123,10 @@ void NetworkConnection::setup_sntp() {
     };
 
     esp_netif_sntp_init(&config);
+
+#else
+
+    _instance->_state_changed.queue(_instance->_synchronization_queue, {.connected = true, .errorReason = 0});
+
+#endif
 }
