@@ -25,7 +25,7 @@ class NetworkConnection {
 public:
     NetworkConnection(Queue *synchronizationQueue, int connect_attempts);
 
-    void begin(const char *ssid, const char *password);
+    void begin(const char *password);
     void on_state_changed(std::function<void(NetworkConnectionState)> func) { _state_changed.add(func); }
 
 private:

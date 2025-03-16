@@ -6,6 +6,7 @@
 #include "esp_netif.h"
 #include "esp_netif_sntp.h"
 #include "esp_wifi.h"
+#include "sdkconfig.h"
 
 LOG_TAG(NetworkConnection);
 
@@ -16,7 +17,7 @@ NetworkConnection::NetworkConnection(Queue *synchronizationQueue, int connect_at
     _instance = this;
 }
 
-void NetworkConnection::begin(const char *ssid, const char *password) {
+void NetworkConnection::begin(const char *password) {
     _wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
@@ -47,6 +48,8 @@ void NetworkConnection::begin(const char *ssid, const char *password) {
     wifi_config_t wifiConfig = {
         .sta =
             {
+                .ssid = CONFIG_WIFI_SSID,
+
                 // Authmode threshold resets to WPA2 as default if password
                 // matches WPA2 standards (pasword len => 8). If you want to
                 // connect the device to deprecated WEP/WPA networks, Please set
@@ -63,7 +66,6 @@ void NetworkConnection::begin(const char *ssid, const char *password) {
             },
     };
 
-    strcpy((char *)wifiConfig.sta.ssid, ssid);
     strcpy((char *)wifiConfig.sta.password, password);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
