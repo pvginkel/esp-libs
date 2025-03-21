@@ -37,7 +37,7 @@ public:
         return func();
     }
 
-    void with(std::function<void(void)> func, TickType_t xTicksToWait = portMAX_DELAY) {
+    void with(std::function<void()> func, TickType_t xTicksToWait = portMAX_DELAY) {
         auto lock = take(xTicksToWait);
         func();
     }
