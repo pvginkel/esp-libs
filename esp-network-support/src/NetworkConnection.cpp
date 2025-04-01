@@ -3,10 +3,10 @@
 #include "NetworkConnection.h"
 
 #include "esp_log.h"
-#include "esp_netif.h"
 #include "esp_netif_sntp.h"
 #include "esp_wifi.h"
 #include "sdkconfig.h"
+#include "strformat.h"
 
 LOG_TAG(NetworkConnection);
 
@@ -23,7 +23,7 @@ void NetworkConnection::begin(const char *password) {
     ESP_ERROR_CHECK(esp_netif_init());
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+    _wifi_interface = esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -73,6 +73,17 @@ void NetworkConnection::begin(const char *password) {
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "Finished setting up WiFi");
+}
+
+std::string NetworkConnection::get_ip_address() {
+    if (_wifi_interface && esp_netif_is_netif_up(_wifi_interface)) {
+        esp_netif_ip_info_t ip_info;
+        ESP_ERROR_CHECK(esp_netif_get_ip_info(_wifi_interface, &ip_info));
+
+        return strformat(IPSTR, IP2STR(&ip_info.ip));
+    }
+
+    return {};
 }
 
 void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, void *eventData) {
