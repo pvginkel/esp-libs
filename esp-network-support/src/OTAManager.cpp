@@ -2,7 +2,6 @@
 
 #include "OTAManager.h"
 
-#include "NetworkConfiguration.h"
 #include "esp_app_format.h"
 #include "esp_log.h"
 
@@ -26,43 +25,6 @@ void OTAManager::begin() {
     ESP_LOGI(TAG, "Started OTA timer");
 }
 
-void OTAManager::bootstrap() {
-    const auto ota_endpoint = get_ota_endpoint();
-    ESP_ERROR_ASSERT(ota_endpoint);
-
-    auto ota_partition = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, "ota");
-    ESP_ERROR_ASSERT(ota_partition);
-    auto factory_partition =
-        esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, "factory");
-    ESP_ERROR_ASSERT(factory_partition);
-
-    OTAConfig ota_config = {
-        .endpoint = ota_endpoint.value().c_str(),
-        .update_partition = ota_partition,
-        .running_partition = ota_partition,
-        .check_only = false,
-        .force = false,
-    };
-
-    const auto installed = install_firmware(ota_config);
-
-    auto err = esp_ota_set_boot_partition(ota_config.update_partition);
-
-    if (!installed && err != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to set boot partition; forcing new firmware");
-
-        ota_config.force = true;
-
-        install_firmware(ota_config);
-
-        err = esp_ota_set_boot_partition(ota_config.update_partition);
-    }
-
-    ESP_ERROR_CHECK(err);
-
-    esp_restart();
-}
-
 void OTAManager::update_check() {
     if (install_update()) {
         ESP_LOGI(TAG, "Firmware installed successfully; restarting system");
@@ -75,73 +37,27 @@ void OTAManager::update_check() {
 }
 
 bool OTAManager::install_update() {
-    const auto ota_endpoint = get_ota_endpoint();
-    if (!ota_endpoint) {
-        return false;
+    auto update_partition = esp_ota_get_next_update_partition(nullptr);
+    ESP_ERROR_ASSERT(update_partition);
+    auto running_partition = esp_ota_get_running_partition();
+    ESP_ERROR_ASSERT(running_partition);
+
+    OTAConfig ota_config = {
+        .endpoint = CONFIG_OTA_ENDPOINT,
+        .update_partition = update_partition,
+        .running_partition = running_partition,
+        .check_only = false,
+    };
+
+    if (install_firmware(ota_config)) {
+        ESP_LOGI(TAG, "App update installed; restarting");
+
+        ESP_ERROR_CHECK(esp_ota_set_boot_partition(ota_config.update_partition));
+
+        return true;
     }
 
-    auto ota_partition = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, "ota");
-    if (ota_partition) {
-        auto factory_partition =
-            esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, "factory");
-        ESP_ERROR_ASSERT(factory_partition);
-
-        ESP_LOGI(TAG, "Detected single partition mode; checking bootstrapper firmware");
-
-        OTAConfig config = {
-            .endpoint = CONFIG_OTA_BOOT_ENDPOINT,
-            .update_partition = factory_partition,
-            .running_partition = factory_partition,
-            .check_only = false,
-        };
-
-        if (install_firmware(config)) {
-            ESP_LOGI(TAG, "Bootstrapper firmware updated; restarting");
-
-            ESP_ERROR_CHECK(esp_ota_set_boot_partition(factory_partition));
-
-            return true;
-        }
-
-        config = {
-            .endpoint = ota_endpoint.value().c_str(),
-            .update_partition = ota_partition,
-            .running_partition = ota_partition,
-            .check_only = true,
-        };
-
-        if (install_firmware(config)) {
-            ESP_LOGI(TAG, "App update found; restarting to install update");
-
-            ESP_ERROR_CHECK(esp_ota_set_boot_partition(factory_partition));
-
-            return true;
-        }
-
-        return false;
-    } else {
-        auto update_partition = esp_ota_get_next_update_partition(nullptr);
-        ESP_ERROR_ASSERT(update_partition);
-        auto running_partition = esp_ota_get_running_partition();
-        ESP_ERROR_ASSERT(running_partition);
-
-        OTAConfig ota_config = {
-            .endpoint = ota_endpoint.value().c_str(),
-            .update_partition = update_partition,
-            .running_partition = running_partition,
-            .check_only = false,
-        };
-
-        if (install_firmware(ota_config)) {
-            ESP_LOGI(TAG, "App update installed; restarting");
-
-            ESP_ERROR_CHECK(esp_ota_set_boot_partition(ota_config.update_partition));
-
-            return true;
-        }
-
-        return false;
-    }
+    return false;
 }
 
 bool OTAManager::install_firmware(OTAConfig &ota_config) {
@@ -299,20 +215,4 @@ bool OTAManager::parse_hash(char *buffer, uint8_t *hash) {
     }
 
     return true;
-}
-
-std::optional<std::string> OTAManager::get_ota_endpoint() {
-    std::string ota_endpoint = CONFIG_OTA_ENDPOINT;
-
-    NetworkConfiguration network_conf;
-    if (network_conf.load()) {
-        ota_endpoint = network_conf.get_ota_endpoint();
-    }
-
-    if (ota_endpoint.empty()) {
-        ESP_LOGE(TAG, "Missing OTA endpoint");
-        return std::nullopt;
-    }
-
-    return ota_endpoint;
 }

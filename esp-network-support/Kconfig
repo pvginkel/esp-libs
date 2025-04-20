@@ -14,9 +14,6 @@ menu "OTA Configuration"
     config OTA_ENDPOINT
         string "OTA endpoint"
 
-    config OTA_BOOT_ENDPOINT
-        string "OTA bootstrapper endpoint"
-
     config OTA_CHECK_INTERVAL
         int "OTA check Interval in seconds"
         default 300
