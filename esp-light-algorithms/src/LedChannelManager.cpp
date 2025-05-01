@@ -14,7 +14,7 @@ esp_err_t LedChannelManager::begin() {
     return ledc_timer_config(&ledc_timer);
 }
 
-esp_err_t LedChannelManager::configureChannel(uint8_t pin, ledc_channel_t channel) {
+esp_err_t LedChannelManager::configure_channel(uint8_t pin, ledc_channel_t channel) {
     // Prepare and then apply the LEDC PWM channel configuration
     ledc_channel_config_t ledc_channel = {
         .gpio_num = pin,
@@ -28,7 +28,7 @@ esp_err_t LedChannelManager::configureChannel(uint8_t pin, ledc_channel_t channe
     return ledc_channel_config(&ledc_channel);
 }
 
-esp_err_t LedChannelManager::setLevel(ledc_channel_t channel, float level) {
+esp_err_t LedChannelManager::set_level(ledc_channel_t channel, float level) {
     auto max_duty_cycle = uint32_t(1) << (int)_timer_bit;
     auto duty_cucle = uint32_t(max_duty_cycle * level);
 

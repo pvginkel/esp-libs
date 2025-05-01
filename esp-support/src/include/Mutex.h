@@ -32,7 +32,7 @@ public:
     [[nodiscard]] MutexLock take(TickType_t xTicksToWait = portMAX_DELAY);
 
     template <typename Result>
-    Result with(std::function<Result(void)> func, TickType_t xTicksToWait = portMAX_DELAY) {
+    Result with(std::function<Result()> func, TickType_t xTicksToWait = portMAX_DELAY) {
         auto lock = take(xTicksToWait);
         return func();
     }

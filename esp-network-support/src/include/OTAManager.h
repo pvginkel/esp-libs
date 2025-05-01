@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-#include <optional>
 #include <string>
 
 #include "Callback.h"
