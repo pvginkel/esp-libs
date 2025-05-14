@@ -21,13 +21,12 @@ class NetworkConnection {
     Queue *_synchronization_queue;
     EventGroupHandle_t _wifi_event_group;
     Callback<NetworkConnectionState> _state_changed;
-    int _connect_attempts;
     int _attempt{};
     bool _have_sntp_synced{};
     esp_netif_t *_wifi_interface{};
 
 public:
-    NetworkConnection(Queue *synchronizationQueue, int connect_attempts);
+    NetworkConnection(Queue *synchronizationQueue);
 
     void begin(const char *password);
     void on_state_changed(std::function<void(NetworkConnectionState)> func) { _state_changed.add(func); }

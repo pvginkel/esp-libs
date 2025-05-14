@@ -7,6 +7,18 @@ menu "Network Configuration"
         bool "Enable SNTP"
         default n
 
+    config WIFI_CONNECT_ATTEMPTS
+        int "WiFi connection attempts"
+        default 1
+
+    config WIFI_MAX_TX_POWER
+        int "WiFi max transmission power"
+        default 0
+
+        help
+            When set to 0, the default will be used. If you want a sane "low"
+            power setting, 44 will suffice. This translates to 11 Db.
+
 endmenu
 
 menu "OTA Configuration"

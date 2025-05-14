@@ -12,8 +12,7 @@ LOG_TAG(NetworkConnection);
 
 NetworkConnection *NetworkConnection::_instance = nullptr;
 
-NetworkConnection::NetworkConnection(Queue *synchronizationQueue, int connect_attempts)
-    : _synchronization_queue(synchronizationQueue), _connect_attempts(connect_attempts) {
+NetworkConnection::NetworkConnection(Queue *synchronizationQueue) : _synchronization_queue(synchronizationQueue) {
     _instance = this;
 }
 
@@ -72,6 +71,17 @@ void NetworkConnection::begin(const char *password) {
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig));
     ESP_ERROR_CHECK(esp_wifi_start());
 
+    if (CONFIG_WIFI_MAX_TX_POWER) {
+        int8_t power;
+        ESP_ERROR_CHECK(esp_wifi_get_max_tx_power(&power));
+
+        const int8_t new_power = (int8_t)CONFIG_WIFI_MAX_TX_POWER;
+
+        ESP_LOGI(TAG, "WiFi power set to %" PRIi8 " changing to %" PRIi8, power, new_power);
+
+        ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(new_power));
+    }
+
     ESP_LOGI(TAG, "Finished setting up WiFi");
 }
 
@@ -98,7 +108,7 @@ void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventI
 
         ESP_LOGW(TAG, "Disconnected from AP, reason %d", event->reason);
 
-        if (_attempt++ < _connect_attempts) {
+        if (_attempt++ < CONFIG_WIFI_CONNECT_ATTEMPTS) {
             ESP_LOGI(TAG, "Retrying...");
             esp_wifi_connect();
         } else {
