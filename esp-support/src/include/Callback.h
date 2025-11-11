@@ -42,7 +42,6 @@ public:
         return true;
     }
 
-    template <typename T = Arg, std::enable_if_t<std::is_trivially_copyable_v<T>, int> = 0>
     void queue(Queue* queue, Arg arg) {
         queue->enqueue([this, arg] { call(arg); });
     }
