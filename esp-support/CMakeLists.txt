@@ -1,7 +1,7 @@
 idf_component_register(
     SRC_DIRS "src"
     INCLUDE_DIRS "src/include"
-    REQUIRES driver freertos esp_timer json
+    REQUIRES driver freertos esp_timer json nvs_flash
 )
 
 if (CMAKE_COMPILER_IS_GNUCC)

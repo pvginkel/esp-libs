@@ -1,5 +1,3 @@
-#include "support.h"
-
 #include "NVSProperty.h"
 
 esp_err_t nvs_get_i1(nvs_handle_t c_handle, const char* key, bool* out_value) {
