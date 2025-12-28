@@ -1,0 +1,15 @@
+menu "MQTT Configuration"
+
+    config MQTT_TOPIC_PREFIX
+        string "MQTT topic prefix"
+
+    config MQTT_DEVICE_MANUFACTURER
+        string "MQTT device manufacturer"
+
+    config MQTT_DEVICE_MODEL
+        string "MQTT device model"
+
+    config MQTT_DEVICE_MODEL_ID
+        string "MQTT device model ID"
+
+endmenu
