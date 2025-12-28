@@ -14,3 +14,14 @@ SwitchState parse_switch_state(const char* value) {
     ESP_LOGW(TAG, "Cannot parse switch state '%s'", value);
     return SwitchState::UNKNOWN;
 }
+
+const char* print_switch_state(SwitchState state) {
+    switch (state) {
+        case SwitchState::ON:
+            return "on";
+        case SwitchState::OFF:
+            return "off";
+        default:
+            return nullptr;
+    }
+}
