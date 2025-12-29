@@ -1,0 +1,7 @@
+menu "Status Led Configuration"
+
+    config STATUS_LED_WS2812_PIN
+        int "Status led pin for the WS2812"
+        default -1
+
+endmenu
