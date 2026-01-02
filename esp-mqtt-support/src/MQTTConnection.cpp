@@ -186,9 +186,13 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
         return;
     }
 
-    auto set_topic = sub_topic + 4;
-    MQTTData mqtt_data = {.topic = set_topic, .data = data};
-    _set_message.call(mqtt_data);
+    auto object_id = std::string(sub_topic + 4);
+    auto it = _command_callbacks.find(object_id);
+    if (it != _command_callbacks.end()) {
+        it->second(data.c_str());
+    } else {
+        ESP_LOGW(TAG, "No callback registered for object_id '%s'", object_id.c_str());
+    }
 }
 
 void MQTTConnection::subscribe(const std::string& topic) {
@@ -229,10 +233,18 @@ void MQTTConnection::publish_json(cJSON* root, const std::string& topic, bool re
     cJSON_free(json);
 }
 
-void MQTTConnection::publish_button_discovery(MQTTDiscovery metadata) {
-    publish_discovery("button", metadata, [this, &metadata](auto json, auto object_id) {
+void MQTTConnection::publish_button_discovery(MQTTDiscovery metadata, std::function<void()> command_func) {
+    publish_discovery("button", metadata, [this, command_func](auto json, auto object_id) {
         cJSON_AddStringToObject(json, "command_topic", (_topic_prefix + "set/" + object_id).c_str());
         cJSON_AddStringToObject(json, "payload_press", "true");
+
+        register_callback(object_id, [command_func](auto data) {
+            if (strcmp(data, "true") == 0) {
+                command_func();
+            } else {
+                ESP_LOGW(TAG, "Invalid button press payload '%s'", data);
+            }
+        });
     });
 }
 
@@ -245,13 +257,24 @@ void MQTTConnection::publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensor
     });
 }
 
-void MQTTConnection::publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata) {
-    publish_discovery("switch", metadata, [this, &component_metadata](auto json, auto object_id) {
+void MQTTConnection::publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata,
+                                              std::function<void(bool)> command_func) {
+    publish_discovery("switch", metadata, [this, &component_metadata, command_func](auto json, auto object_id) {
         cJSON_AddStringToObject(json, "command_topic", (_topic_prefix + "set/" + object_id).c_str());
         cJSON_AddStringToObject(json, "payload_on", "on");
         cJSON_AddStringToObject(json, "payload_off", "off");
         cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
         cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
+
+        register_callback(object_id, [command_func](auto data) {
+            if (strcmp(data, "on") == 0) {
+                command_func(true);
+            } else if (strcmp(data, "off") == 0) {
+                command_func(false);
+            } else {
+                ESP_LOGW(TAG, "Cannot parse switch state '%s'", data);
+            }
+        });
     });
 }
 
@@ -265,8 +288,9 @@ void MQTTConnection::publish_binary_sensor_discovery(MQTTDiscovery metadata,
     });
 }
 
-void MQTTConnection::publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata) {
-    publish_discovery("binary_sensor", metadata, [this, &component_metadata](auto json, auto object_id) {
+void MQTTConnection::publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata,
+                                              std::function<void(const char*)> command_func) {
+    publish_discovery("binary_sensor", metadata, [this, &component_metadata, command_func](auto json, auto object_id) {
         if (component_metadata.unit_of_measurement) {
             cJSON_AddStringToObject(json, "unit_of_measurement", component_metadata.unit_of_measurement);
         }
@@ -276,6 +300,8 @@ void MQTTConnection::publish_number_discovery(MQTTDiscovery metadata, MQTTNumber
         cJSON_AddStringToObject(json, "command_topic", (_topic_prefix + "set/" + object_id).c_str());
         cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
         cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
+
+        register_callback(object_id, command_func);
     });
 }
 
@@ -347,6 +373,10 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
     publish_json(root, strformat("homeassistant/%s/%s/%s/config", component, _device_id.c_str(), object_id), true);
 
     cJSON_free(root);
+}
+
+void MQTTConnection::register_callback(const char* object_id, std::function<void(const char*)> callback) {
+    _command_callbacks[object_id] = std::move(callback);
 }
 
 std::string MQTTConnection::get_firmware_version() {

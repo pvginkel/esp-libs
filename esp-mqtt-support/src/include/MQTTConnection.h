@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 
 #include "Callback.h"
@@ -18,11 +19,6 @@ struct MQTTConfiguration {
     std::string mqtt_password;
     std::string device_name;
     std::string device_entity_id;
-};
-
-struct MQTTData {
-    const std::string& topic;
-    const std::string& data;
 };
 
 struct MQTTDiscovery {
@@ -70,7 +66,7 @@ class MQTTConnection {
     esp_mqtt_client_handle_t _client{};
     Callback<MQTTConnectionState> _connected_changed;
     Callback<void> _publish_discovery;
-    Callback<MQTTData&> _set_message;
+    std::map<std::string, std::function<void(const char*)>> _command_callbacks;
 
 public:
     MQTTConnection(Queue* queue);
@@ -81,12 +77,13 @@ public:
     void send_state(cJSON* data);
     void on_connected_changed(std::function<void(MQTTConnectionState)> func) { _connected_changed.add(func); }
     void on_publish_discovery(std::function<void()> func) { _publish_discovery.add(func); }
-    void on_set_message(std::function<void(MQTTData&)> func) { _set_message.add(func); }
-    void publish_button_discovery(MQTTDiscovery metadata);
+    void publish_button_discovery(MQTTDiscovery metadata, std::function<void()> command_func);
     void publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensorDiscovery component_metadata);
-    void publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata);
+    void publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata,
+                                  std::function<void(bool)> command_func);
     void publish_binary_sensor_discovery(MQTTDiscovery metadata, MQTTBinarySensorDiscovery component_metadata);
-    void publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata);
+    void publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata,
+                                  std::function<void(const char*)> command_func);
 
 private:
     void event_handler(esp_event_base_t eventBase, int32_t eventId, void* eventData);
@@ -98,5 +95,6 @@ private:
     void publish_json(cJSON* root, const std::string& topic, bool retain);
     void publish_discovery(const char* component, const MQTTDiscovery& metadata,
                            std::function<void(cJSON* json, const char* object_id)> func);
+    void register_callback(const char* object_id, std::function<void(const char*)> callback);
     std::string get_firmware_version();
 };
