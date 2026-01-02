@@ -1,5 +1,5 @@
 version: "0.1.0"
-description: Network support for the ESP32
+description: Support for different sensors for the ESP32
 url: https://github.com/pvginkel/esp-libs
 dependencies:
   idf: ">=5.3"
