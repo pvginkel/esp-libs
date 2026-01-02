@@ -25,6 +25,39 @@ struct MQTTData {
     const std::string& data;
 };
 
+struct MQTTDiscovery {
+    const char* name;
+    const char* object_id;
+    const char* icon;
+    const char* entity_category;
+    const char* device_class;
+    const char* subdevice_name;
+    const char* subdevice_id;
+    bool enabled_by_default = true;
+};
+
+struct MQTTSensorDiscovery {
+    const char* state_class;
+    const char* unit_of_measurement;
+    const char* value_template;
+};
+
+struct MQTTSwitchDiscovery {
+    const char* value_template;
+};
+
+struct MQTTBinarySensorDiscovery {
+    const char* value_template;
+};
+
+struct MQTTNumberDiscovery {
+    const char* unit_of_measurement;
+    const char* value_template;
+    double min;
+    double max;
+    double step;
+};
+
 class MQTTConnection {
     static constexpr double DEFAULT_SETPOINT = 19;
 
@@ -49,13 +82,11 @@ public:
     void on_connected_changed(std::function<void(MQTTConnectionState)> func) { _connected_changed.add(func); }
     void on_publish_discovery(std::function<void()> func) { _publish_discovery.add(func); }
     void on_set_message(std::function<void(MQTTData&)> func) { _set_message.add(func); }
-    void publish_button_discovery(const char* name, const char* object_id, const char* icon,
-                                  const char* entity_category, const char* device_class);
-    void publish_sensor_discovery(const char* name, const char* object_id, const char* icon,
-                                  const char* entity_category, const char* device_class, const char* state_class,
-                                  const char* unit_of_measurement, const char* value_template);
-    void publish_switch_discovery(const char* name, const char* object_id, const char* icon,
-                                  const char* entity_category, const char* device_class, const char* value_template);
+    void publish_button_discovery(MQTTDiscovery metadata);
+    void publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensorDiscovery component_metadata);
+    void publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata);
+    void publish_binary_sensor_discovery(MQTTDiscovery metadata, MQTTBinarySensorDiscovery component_metadata);
+    void publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata);
 
 private:
     void event_handler(esp_event_base_t eventBase, int32_t eventId, void* eventData);
@@ -65,8 +96,7 @@ private:
     void unsubscribe(const std::string& topic);
     void publish_configuration();
     void publish_json(cJSON* root, const std::string& topic, bool retain);
-    cJSON_Data create_discovery(const char* component, const char* name, const char* object_id,
-                                const char* subdevice_name, const char* subdevice_id, const char* icon,
-                                const char* entity_category, const char* device_class, bool enabled_by_default);
+    void publish_discovery(const char* component, const MQTTDiscovery& metadata,
+                           std::function<void(cJSON* json, const char* object_id)> func);
     std::string get_firmware_version();
 };

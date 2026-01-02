@@ -229,72 +229,71 @@ void MQTTConnection::publish_json(cJSON* root, const std::string& topic, bool re
     cJSON_free(json);
 }
 
-void MQTTConnection::publish_button_discovery(const char* name, const char* object_id, const char* icon,
-                                              const char* entity_category, const char* device_class) {
-    auto root =
-        create_discovery("button", name, object_id, nullptr, nullptr, icon, entity_category, device_class, true);
-
-    cJSON_AddStringToObject(*root, "command_topic",
-                            strformat(CONFIG_MQTT_TOPIC_PREFIX "/%s/set/%s", _device_id.c_str(), object_id).c_str());
-    cJSON_AddStringToObject(*root, "payload_press", "true");
-
-    publish_json(*root, strformat("homeassistant/button/%s/%s/config", _device_id.c_str(), object_id), true);
+void MQTTConnection::publish_button_discovery(MQTTDiscovery metadata) {
+    publish_discovery("button", metadata, [this, &metadata](auto json, auto object_id) {
+        cJSON_AddStringToObject(json, "command_topic", (_topic_prefix + "set/" + object_id).c_str());
+        cJSON_AddStringToObject(json, "payload_press", "true");
+    });
 }
 
-void MQTTConnection::publish_sensor_discovery(const char* name, const char* object_id, const char* icon,
-                                              const char* entity_category, const char* device_class,
-                                              const char* state_class, const char* unit_of_measurement,
-                                              const char* value_template) {
-    auto root =
-        create_discovery("sensor", name, object_id, nullptr, nullptr, icon, entity_category, device_class, true);
-
-    cJSON_AddStringToObject(*root, "state_class", state_class);
-
-    auto state_topic = _topic_prefix + "state";
-    cJSON_AddStringToObject(*root, "state_topic", state_topic.c_str());
-
-    cJSON_AddStringToObject(*root, "unit_of_measurement", unit_of_measurement);
-    cJSON_AddStringToObject(*root, "value_template", value_template);
-
-    publish_json(*root, strformat("homeassistant/sensor/%s/%s/config", _device_id.c_str(), object_id), true);
+void MQTTConnection::publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensorDiscovery component_metadata) {
+    publish_discovery("sensor", metadata, [this, &component_metadata](auto json, auto object_id) {
+        cJSON_AddStringToObject(json, "state_class", component_metadata.state_class);
+        cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
+        cJSON_AddStringToObject(json, "unit_of_measurement", component_metadata.unit_of_measurement);
+        cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
+    });
 }
 
-void MQTTConnection::publish_switch_discovery(const char* name, const char* object_id, const char* icon,
-                                              const char* entity_category, const char* device_class,
-                                              const char* value_template) {
-    auto root =
-        create_discovery("switch", name, object_id, nullptr, nullptr, icon, entity_category, device_class, true);
-
-    cJSON_AddStringToObject(*root, "command_topic",
-                            strformat(CONFIG_MQTT_TOPIC_PREFIX "/%s/set/%s", _device_id.c_str(), object_id).c_str());
-    cJSON_AddStringToObject(*root, "payload_on", "on");
-    cJSON_AddStringToObject(*root, "payload_off", "off");
-
-    auto state_topic = _topic_prefix + "state";
-    cJSON_AddStringToObject(*root, "state_topic", state_topic.c_str());
-
-    cJSON_AddStringToObject(*root, "value_template", value_template);
-
-    publish_json(*root, strformat("homeassistant/switch/%s/%s/config", _device_id.c_str(), object_id), true);
+void MQTTConnection::publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata) {
+    publish_discovery("switch", metadata, [this, &component_metadata](auto json, auto object_id) {
+        cJSON_AddStringToObject(json, "command_topic", (_topic_prefix + "set/" + object_id).c_str());
+        cJSON_AddStringToObject(json, "payload_on", "on");
+        cJSON_AddStringToObject(json, "payload_off", "off");
+        cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
+        cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
+    });
 }
 
-cJSON_Data MQTTConnection::create_discovery(const char* component, const char* name, const char* object_id,
-                                            const char* subdevice_name, const char* subdevice_id, const char* icon,
-                                            const char* entity_category, const char* device_class,
-                                            bool enabled_by_default) {
+void MQTTConnection::publish_binary_sensor_discovery(MQTTDiscovery metadata,
+                                                     MQTTBinarySensorDiscovery component_metadata) {
+    publish_discovery("binary_sensor", metadata, [this, &component_metadata](auto json, auto object_id) {
+        cJSON_AddBoolToObject(json, "payload_on", true);
+        cJSON_AddBoolToObject(json, "payload_off", false);
+        cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
+        cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
+    });
+}
+
+void MQTTConnection::publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata) {
+    publish_discovery("binary_sensor", metadata, [this, &component_metadata](auto json, auto object_id) {
+        if (component_metadata.unit_of_measurement) {
+            cJSON_AddStringToObject(json, "unit_of_measurement", component_metadata.unit_of_measurement);
+        }
+        cJSON_AddNumberToObject(json, "min", component_metadata.min);
+        cJSON_AddNumberToObject(json, "max", component_metadata.max);
+        cJSON_AddNumberToObject(json, "step", component_metadata.step);
+        cJSON_AddStringToObject(json, "command_topic", (_topic_prefix + "set/" + object_id).c_str());
+        cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
+        cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
+    });
+}
+
+void MQTTConnection::publish_discovery(const char* component, const MQTTDiscovery& metadata,
+                                       std::function<void(cJSON* json, const char* object_id)> func) {
     // Device classes can be found here: https://www.home-assistant.io/integrations/sensor/#device-class.
     // Entity category is either config or diagnostic.
     // MDI icons can be found here: https://pictogrammers.com/library/mdi/.
 
     const auto root = cJSON_CreateObject();
 
-    cJSON_AddStringToObject(root, "name", name);
-    cJSON_AddStringToObject(root, "icon", icon);
-    if (entity_category) {
-        cJSON_AddStringToObject(root, "entity_category", entity_category);
+    cJSON_AddStringToObject(root, "name", metadata.name);
+    cJSON_AddStringToObject(root, "icon", metadata.icon);
+    if (metadata.entity_category) {
+        cJSON_AddStringToObject(root, "entity_category", metadata.entity_category);
     }
-    if (device_class) {
-        cJSON_AddStringToObject(root, "device_class", device_class);
+    if (metadata.device_class) {
+        cJSON_AddStringToObject(root, "device_class", metadata.device_class);
     }
 
     const auto availability = cJSON_AddArrayToObject(root, "availability");
@@ -312,10 +311,10 @@ cJSON_Data MQTTConnection::create_discovery(const char* component, const char* n
     const auto device = cJSON_AddObjectToObject(root, "device");
 
     auto device_identifier = strformat("%s_%s", CONFIG_MQTT_TOPIC_PREFIX, _device_id.c_str());
-    if (subdevice_id) {
+    if (metadata.subdevice_id) {
         cJSON_AddStringToObject(device, "via_device", device_identifier.c_str());
 
-        device_identifier += strformat("_%s", subdevice_id);
+        device_identifier += strformat("_%s", metadata.subdevice_id);
     }
 
     const auto identifiers = cJSON_AddArrayToObject(device, "identifiers");
@@ -324,22 +323,30 @@ cJSON_Data MQTTConnection::create_discovery(const char* component, const char* n
     cJSON_AddStringToObject(device, "manufacturer", CONFIG_MQTT_DEVICE_MANUFACTURER);
     cJSON_AddStringToObject(device, "model", CONFIG_MQTT_DEVICE_MODEL);
     cJSON_AddStringToObject(device, "model_id", CONFIG_MQTT_DEVICE_MODEL_ID);
-    if (subdevice_name) {
-        cJSON_AddStringToObject(device, "name", subdevice_name);
+    if (metadata.subdevice_name) {
+        cJSON_AddStringToObject(device, "name", metadata.subdevice_name);
     } else {
         cJSON_AddStringToObject(device, "name", _configuration.device_name.c_str());
     }
     cJSON_AddStringToObject(device, "sw_version", get_firmware_version().c_str());
 
-    cJSON_AddStringToObject(root, "unique_id", strformat("%s_%s_%s", _device_id.c_str(), component, object_id).c_str());
-    cJSON_AddStringToObject(root, "object_id",
-                            strformat("%s_%s", _configuration.device_entity_id.c_str(), object_id).c_str());
+    const auto object_id = metadata.subdevice_id ? strformat("%s_%s", metadata.subdevice_id, metadata.object_id)
+                                                 : std::string(metadata.object_id);
 
-    if (!enabled_by_default) {
+    cJSON_AddStringToObject(root, "unique_id",
+                            strformat("%s_%s_%s", _device_id.c_str(), component, object_id.c_str()).c_str());
+    cJSON_AddStringToObject(root, "object_id",
+                            strformat("%s_%s", _configuration.device_entity_id.c_str(), object_id.c_str()).c_str());
+
+    if (!metadata.enabled_by_default) {
         cJSON_AddBoolToObject(root, "enabled_by_default", false);
     }
 
-    return root;
+    func(root, object_id.c_str());
+
+    publish_json(root, strformat("homeassistant/%s/%s/%s/config", component, _device_id.c_str(), object_id), true);
+
+    cJSON_free(root);
 }
 
 std::string MQTTConnection::get_firmware_version() {
