@@ -160,7 +160,10 @@ void MQTTConnection::handle_connected() {
 
     _published_discovery_topics.clear();
     _publish_discovery.call();
-    subscribe(strformat("homeassistant/+/%s/+/config", _device_id.c_str()));
+
+    auto discovery_topic = strformat("homeassistant/+/%s/+/config", _device_id.c_str());
+    subscribe(discovery_topic);
+    _queue->enqueue_delayed([this, discovery_topic]() { unsubscribe(discovery_topic); }, 60000);
 
     _connected_changed.queue(_queue, {true});
 }
