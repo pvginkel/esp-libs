@@ -157,7 +157,10 @@ void MQTTConnection::handle_connected() {
     subscribe(_topic_prefix + "set/#");
 
     publish_configuration();
+
+    _published_discovery_topics.clear();
     _publish_discovery.call();
+    subscribe(strformat("homeassistant/+/%s/+/config", _device_id.c_str()));
 
     _connected_changed.queue(_queue, {true});
 }
@@ -173,23 +176,27 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
 
     auto topic = std::string(event->topic, event->topic_len);
 
+    if (handle_discovery_prune(topic)) {
+        return;
+    }
+
     if (!topic.starts_with(_topic_prefix)) {
         ESP_LOGE(TAG, "Unexpected topic %s topic len %d data len %d", topic.c_str(), event->topic_len, event->data_len);
         return;
     }
 
-    auto sub_topic = topic.c_str() + _topic_prefix.length();
-    auto data = std::string(event->data, event->data_len);
+    auto sub_topic = topic.substr(_topic_prefix.length());
 
-    if (strncmp(sub_topic, "set/", 4) != 0) {
+    if (!sub_topic.starts_with("set/")) {
         ESP_LOGE(TAG, "Unknown topic %s", topic.c_str());
         return;
     }
 
-    auto object_id = std::string(sub_topic + 4);
+    auto object_id = sub_topic.substr(4);
     auto it = _command_callbacks.find(object_id);
     if (it != _command_callbacks.end()) {
-        it->second(data.c_str());
+        auto data = std::string(event->data, event->data_len);
+        it->second(data);
     } else {
         ESP_LOGW(TAG, "No callback registered for object_id '%s'", object_id.c_str());
     }
@@ -239,7 +246,7 @@ void MQTTConnection::publish_button_discovery(MQTTDiscovery metadata, std::funct
         cJSON_AddStringToObject(json, "payload_press", "true");
 
         register_callback(object_id, [command_func](auto data) {
-            if (strcmp(data, "true") == 0) {
+            if (data == "true") {
                 command_func();
             } else {
                 ESP_LOGW(TAG, "Invalid button press payload '%s'", data);
@@ -267,9 +274,9 @@ void MQTTConnection::publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitch
         cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
 
         register_callback(object_id, [command_func](auto data) {
-            if (strcmp(data, "on") == 0) {
+            if (data == "on") {
                 command_func(true);
-            } else if (strcmp(data, "off") == 0) {
+            } else if (data == "off") {
                 command_func(false);
             } else {
                 ESP_LOGW(TAG, "Cannot parse switch state '%s'", data);
@@ -289,7 +296,7 @@ void MQTTConnection::publish_binary_sensor_discovery(MQTTDiscovery metadata,
 }
 
 void MQTTConnection::publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata,
-                                              std::function<void(const char*)> command_func) {
+                                              std::function<void(const std::string&)> command_func) {
     publish_discovery("binary_sensor", metadata, [this, &component_metadata, command_func](auto json, auto object_id) {
         if (component_metadata.unit_of_measurement) {
             cJSON_AddStringToObject(json, "unit_of_measurement", component_metadata.unit_of_measurement);
@@ -370,13 +377,26 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
 
     func(root, object_id.c_str());
 
-    publish_json(root, strformat("homeassistant/%s/%s/%s/config", component, _device_id.c_str(), object_id), true);
+    auto topic = strformat("homeassistant/%s/%s/%s/config", component, _device_id.c_str(), object_id);
+    _published_discovery_topics.insert(topic);
+    publish_json(root, topic, true);
 
     cJSON_free(root);
 }
 
-void MQTTConnection::register_callback(const char* object_id, std::function<void(const char*)> callback) {
+void MQTTConnection::register_callback(const char* object_id, std::function<void(const std::string&)> callback) {
     _command_callbacks[object_id] = std::move(callback);
+}
+
+bool MQTTConnection::handle_discovery_prune(const std::string& topic) {
+    if (_published_discovery_topics.find(topic) != _published_discovery_topics.end()) {
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Pruning stale discovery topic %s", topic.c_str());
+    ESP_ERROR_ASSERT(esp_mqtt_client_publish(_client, topic.c_str(), "", 0, QOS_MIN_ONE, true) >= 0);
+
+    return true;
 }
 
 std::string MQTTConnection::get_firmware_version() {

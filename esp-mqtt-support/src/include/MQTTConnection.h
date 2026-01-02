@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <string>
 
 #include "Callback.h"
@@ -66,7 +67,8 @@ class MQTTConnection {
     esp_mqtt_client_handle_t _client{};
     Callback<MQTTConnectionState> _connected_changed;
     Callback<void> _publish_discovery;
-    std::map<std::string, std::function<void(const char*)>> _command_callbacks;
+    std::map<std::string, std::function<void(const std::string&)>> _command_callbacks;
+    std::set<std::string> _published_discovery_topics;
 
 public:
     MQTTConnection(Queue* queue);
@@ -83,7 +85,7 @@ public:
                                   std::function<void(bool)> command_func);
     void publish_binary_sensor_discovery(MQTTDiscovery metadata, MQTTBinarySensorDiscovery component_metadata);
     void publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata,
-                                  std::function<void(const char*)> command_func);
+                                  std::function<void(const std::string&)> command_func);
 
 private:
     void event_handler(esp_event_base_t eventBase, int32_t eventId, void* eventData);
@@ -95,6 +97,7 @@ private:
     void publish_json(cJSON* root, const std::string& topic, bool retain);
     void publish_discovery(const char* component, const MQTTDiscovery& metadata,
                            std::function<void(cJSON* json, const char* object_id)> func);
-    void register_callback(const char* object_id, std::function<void(const char*)> callback);
+    void register_callback(const char* object_id, std::function<void(const std::string&)> callback);
+    bool handle_discovery_prune(const std::string& topic);
     std::string get_firmware_version();
 };
