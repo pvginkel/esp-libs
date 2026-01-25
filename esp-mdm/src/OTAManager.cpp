@@ -1,9 +1,13 @@
-#include "support.h"
-
 #include "OTAManager.h"
 
 #include "esp_app_format.h"
 #include "esp_log.h"
+#include "sdkconfig.h"
+#include "support.h"
+
+// TODO: REMOVE
+#define CONFIG_OTA_CHECK_INTERVAL 15
+#define CONFIG_OTA_ENDPOINT "xx"
 
 constexpr auto OTA_INITIAL_CHECK_INTERVAL = 5;
 constexpr auto HASH_LENGTH = 32;  // SHA-256 hash length
@@ -15,7 +19,7 @@ OTAManager::OTAManager() : _update_timer(nullptr) {}
 
 void OTAManager::begin() {
     const esp_timer_create_args_t displayOffTimerArgs = {
-        .callback = [](void *arg) { ((OTAManager *)arg)->update_check(); },
+        .callback = [](void* arg) { ((OTAManager*)arg)->update_check(); },
         .arg = this,
         .name = "updateTimer",
     };
@@ -60,7 +64,7 @@ bool OTAManager::install_update() {
     return false;
 }
 
-bool OTAManager::install_firmware(OTAConfig &ota_config) {
+bool OTAManager::install_firmware(OTAConfig& ota_config) {
     auto firmware_installed = false;
     auto ota_busy = false;
 
@@ -70,7 +74,7 @@ bool OTAManager::install_firmware(OTAConfig &ota_config) {
 
     esp_http_client_config_t config = {
         .url = ota_config.endpoint,
-        .timeout_ms = CONFIG_OTA_RECV_TIMEOUT,
+        .timeout_ms = CONFIG_MDM_OTA_RECV_TIMEOUT,
     };
 
     ESP_LOGI(TAG, "Getting firmware from '%s'", config.url);
@@ -158,12 +162,12 @@ bool OTAManager::install_firmware(OTAConfig &ota_config) {
 
             const auto update_partition_subtype = ota_config.update_partition->subtype;
             if (ota_config.update_partition->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY) {
-                ((esp_partition_t *)ota_config.update_partition)->subtype = ESP_PARTITION_SUBTYPE_APP_OTA_0;
+                ((esp_partition_t*)ota_config.update_partition)->subtype = ESP_PARTITION_SUBTYPE_APP_OTA_0;
             }
 
             err = esp_ota_begin(ota_config.update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle);
 
-            ((esp_partition_t *)ota_config.update_partition)->subtype = update_partition_subtype;
+            ((esp_partition_t*)ota_config.update_partition)->subtype = update_partition_subtype;
 
             ESP_ERROR_CHECK_JUMP(err, end);
 
@@ -172,7 +176,7 @@ bool OTAManager::install_firmware(OTAConfig &ota_config) {
             ESP_LOGI(TAG, "Downloading new firmware");
         }
 
-        ESP_ERROR_CHECK_JUMP(esp_ota_write(update_handle, (const void *)buffer, read), end);
+        ESP_ERROR_CHECK_JUMP(esp_ota_write(update_handle, (const void*)buffer, read), end);
 
         firmware_size += read;
 
@@ -202,7 +206,7 @@ end:
     return firmware_installed;
 }
 
-bool OTAManager::parse_hash(char *buffer, uint8_t *hash) {
+bool OTAManager::parse_hash(char* buffer, uint8_t* hash) {
     for (auto i = 0; i < HASH_LENGTH; i++) {
         auto h = hextoi(buffer[i * 2]);
         auto l = hextoi(buffer[i * 2 + 1]);

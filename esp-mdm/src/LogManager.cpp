@@ -1,8 +1,10 @@
-#include "support.h"
-
 #include "LogManager.h"
 
 #include "cJSON.h"
+#include "support.h"
+
+// TODO: REMOVE
+#define CONFIG_LOG_ENDPOINT "http://iotlogging.home/"
 
 constexpr auto BUFFER_SIZE = 1024;
 constexpr auto BLOCK_SIZE = 10;

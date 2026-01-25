@@ -8,15 +8,18 @@
 #include "sdkconfig.h"
 #include "strformat.h"
 
+// TODO: REMOVE!
+#define CONFIG_WIFI_SSID "Thing-Fish"
+
 LOG_TAG(NetworkConnection);
 
-NetworkConnection *NetworkConnection::_instance = nullptr;
+NetworkConnection* NetworkConnection::_instance = nullptr;
 
-NetworkConnection::NetworkConnection(Queue *synchronizationQueue) : _synchronization_queue(synchronizationQueue) {
+NetworkConnection::NetworkConnection(Queue* synchronizationQueue) : _synchronization_queue(synchronizationQueue) {
     _instance = this;
 }
 
-void NetworkConnection::begin(const char *password) {
+void NetworkConnection::begin(const char* password) {
     _wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
@@ -33,14 +36,14 @@ void NetworkConnection::begin(const char *password) {
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         WIFI_EVENT, ESP_EVENT_ANY_ID,
         [](auto eventHandlerArg, auto eventBase, auto eventId, auto eventData) {
-            ((NetworkConnection *)eventHandlerArg)->event_handler(eventBase, eventId, eventData);
+            ((NetworkConnection*)eventHandlerArg)->event_handler(eventBase, eventId, eventData);
         },
         this, &instanceAnyId));
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         IP_EVENT, IP_EVENT_STA_GOT_IP,
         [](auto eventHandlerArg, auto eventBase, auto eventId, auto eventData) {
-            ((NetworkConnection *)eventHandlerArg)->event_handler(eventBase, eventId, eventData);
+            ((NetworkConnection*)eventHandlerArg)->event_handler(eventBase, eventId, eventData);
         },
         this, &instanceGotIp));
 
@@ -65,7 +68,7 @@ void NetworkConnection::begin(const char *password) {
             },
     };
 
-    strcpy((char *)wifiConfig.sta.password, password);
+    strcpy((char*)wifiConfig.sta.password, password);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig));
@@ -96,12 +99,12 @@ std::string NetworkConnection::get_ip_address() {
     return {};
 }
 
-void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, void *eventData) {
+void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, void* eventData) {
     if (eventBase == WIFI_EVENT && eventId == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "Connecting to AP, attempt %d", _attempt + 1);
         esp_wifi_connect();
     } else if (eventBase == WIFI_EVENT && eventId == WIFI_EVENT_STA_DISCONNECTED) {
-        auto event = (wifi_event_sta_disconnected_t *)eventData;
+        auto event = (wifi_event_sta_disconnected_t*)eventData;
 
         // Reasons are defined here:
         // https://github.com/espressif/esp-idf/blob/4b5b064caf951a48b48a39293d625b5de2132719/components/esp_wifi/include/esp_wifi_types_generic.h#L79.
@@ -115,7 +118,7 @@ void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventI
             _state_changed.queue(_synchronization_queue, {.connected = false, .errorReason = event->reason});
         }
     } else if (eventBase == IP_EVENT && eventId == IP_EVENT_STA_GOT_IP) {
-        auto event = (ip_event_got_ip_t *)eventData;
+        auto event = (ip_event_got_ip_t*)eventData;
 
         ESP_LOGI(TAG, "Got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 
@@ -130,7 +133,7 @@ void NetworkConnection::setup_sntp() {
 
     esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
 
-    config.sync_cb = [](struct timeval *tv) {
+    config.sync_cb = [](struct timeval* tv) {
         tm time_info;
         localtime_r(&tv->tv_sec, &time_info);
 

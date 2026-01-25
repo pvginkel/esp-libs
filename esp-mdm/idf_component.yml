@@ -1,0 +1,10 @@
+version: "0.1.0"
+description: Mobile Device Management for the ESP32
+url: https://github.com/pvginkel/esp-libs
+dependencies:
+  idf: ">=5.3"
+  esp-support:
+    path: ../esp-mqtt-support
+files:
+  exclude:
+    - ".github"

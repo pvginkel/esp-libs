@@ -1,15 +1,12 @@
 menu "Network Configuration"
 
-    config WIFI_SSID
-        string "WiFi SSID"
-
     config ENABLE_SNTP
         bool "Enable SNTP"
         default n
 
     config WIFI_CONNECT_ATTEMPTS
         int "WiFi connection attempts"
-        default 1
+        default 5
 
     config WIFI_MAX_TX_POWER
         int "WiFi max transmission power"
@@ -21,25 +18,7 @@ menu "Network Configuration"
 
 endmenu
 
-menu "OTA Configuration"
-
-    config OTA_ENDPOINT
-        string "OTA endpoint"
-
-    config OTA_CHECK_INTERVAL
-        int "OTA check Interval in seconds"
-        default 300
-
-    config OTA_RECV_TIMEOUT
-        int "OTA receive timeout in ms"
-        default 15000
-
-endmenu
-
 menu "Logging Configuration"
-
-    config LOG_ENDPOINT
-        string "Logging endpoint"
 
     config LOG_INTERVAL
         int "Interval to upload log messages in ms"
