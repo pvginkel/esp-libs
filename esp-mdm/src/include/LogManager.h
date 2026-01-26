@@ -34,7 +34,7 @@ class LogManager {
 public:
     LogManager();
 
-    void begin();
+    esp_err_t begin();
     void set_device_entity_id(const char* device_entity_id);
 
 private:

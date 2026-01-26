@@ -1,7 +1,8 @@
+#include "support.h"
+
 #include "LogManager.h"
 
 #include "cJSON.h"
-#include "support.h"
 
 // TODO: REMOVE
 #define CONFIG_LOG_ENDPOINT "http://iotlogging.home/"
@@ -49,7 +50,7 @@ int LogManager::log_handler(const char* message, va_list va) {
 
 LogManager::LogManager() { _instance = this; }
 
-void LogManager::begin() {
+esp_err_t LogManager::begin() {
     _default_log_handler = esp_log_set_vprintf(log_handler);
 
     const esp_timer_create_args_t displayOffTimerArgs = {
@@ -58,7 +59,10 @@ void LogManager::begin() {
         .name = "logManagerTimer",
     };
 
-    ESP_ERROR_CHECK(esp_timer_create(&displayOffTimerArgs, &_log_timer));
+    auto err = esp_timer_create(&displayOffTimerArgs, &_log_timer);
+    if (err != ESP_OK) {
+        return err;
+    }
 
     esp_register_shutdown_handler([]() {
         if (_instance) {
@@ -67,6 +71,8 @@ void LogManager::begin() {
             _instance->upload_logs();
         }
     });
+
+    return ESP_OK;
 }
 
 void LogManager::set_device_entity_id(const char* device_entity_id) {

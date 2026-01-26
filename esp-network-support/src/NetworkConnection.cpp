@@ -19,33 +19,52 @@ NetworkConnection::NetworkConnection(Queue* synchronizationQueue) : _synchroniza
     _instance = this;
 }
 
-void NetworkConnection::begin(const char* password) {
+esp_err_t NetworkConnection::begin(const char* password) {
     _wifi_event_group = xEventGroupCreate();
 
-    ESP_ERROR_CHECK(esp_netif_init());
+    esp_err_t err = esp_netif_init();
+    if (err != ESP_OK) {
+        return err;
+    }
 
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK) {
+        return err;
+    }
+
     _wifi_interface = esp_netif_create_default_wifi_sta();
+    if (_wifi_interface == nullptr) {
+        return ESP_FAIL;
+    }
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    err = esp_wifi_init(&cfg);
+    if (err != ESP_OK) {
+        return err;
+    }
 
     esp_event_handler_instance_t instanceAnyId;
     esp_event_handler_instance_t instanceGotIp;
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(
+    err = esp_event_handler_instance_register(
         WIFI_EVENT, ESP_EVENT_ANY_ID,
         [](auto eventHandlerArg, auto eventBase, auto eventId, auto eventData) {
             ((NetworkConnection*)eventHandlerArg)->event_handler(eventBase, eventId, eventData);
         },
-        this, &instanceAnyId));
+        this, &instanceAnyId);
+    if (err != ESP_OK) {
+        return err;
+    }
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(
+    err = esp_event_handler_instance_register(
         IP_EVENT, IP_EVENT_STA_GOT_IP,
         [](auto eventHandlerArg, auto eventBase, auto eventId, auto eventData) {
             ((NetworkConnection*)eventHandlerArg)->event_handler(eventBase, eventId, eventData);
         },
-        this, &instanceGotIp));
+        this, &instanceGotIp);
+    if (err != ESP_OK) {
+        return err;
+    }
 
     wifi_config_t wifiConfig = {
         .sta =
@@ -70,22 +89,41 @@ void NetworkConnection::begin(const char* password) {
 
     strcpy((char*)wifiConfig.sta.password, password);
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = esp_wifi_set_config(WIFI_IF_STA, &wifiConfig);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = esp_wifi_start();
+    if (err != ESP_OK) {
+        return err;
+    }
 
     if (CONFIG_WIFI_MAX_TX_POWER) {
         int8_t power;
-        ESP_ERROR_CHECK(esp_wifi_get_max_tx_power(&power));
+        err = esp_wifi_get_max_tx_power(&power);
+        if (err != ESP_OK) {
+            return err;
+        }
 
         const int8_t new_power = (int8_t)CONFIG_WIFI_MAX_TX_POWER;
 
         ESP_LOGI(TAG, "WiFi power set to %" PRIi8 " changing to %" PRIi8, power, new_power);
 
-        ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(new_power));
+        err = esp_wifi_set_max_tx_power(new_power);
+        if (err != ESP_OK) {
+            return err;
+        }
     }
 
     ESP_LOGI(TAG, "Finished setting up WiFi");
+
+    return ESP_OK;
 }
 
 std::string NetworkConnection::get_ip_address() {

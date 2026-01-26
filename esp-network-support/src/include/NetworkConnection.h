@@ -28,7 +28,7 @@ class NetworkConnection {
 public:
     NetworkConnection(Queue *synchronizationQueue);
 
-    void begin(const char *password);
+    esp_err_t begin(const char *password);
     void on_state_changed(std::function<void(NetworkConnectionState)> func) { _state_changed.add(func); }
     std::string get_ip_address();
 

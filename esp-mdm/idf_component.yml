@@ -3,8 +3,12 @@ description: Mobile Device Management for the ESP32
 url: https://github.com/pvginkel/esp-libs
 dependencies:
   idf: ">=5.3"
-  esp-support:
+  esp-mqtt-support:
     path: ../esp-mqtt-support
+  esp-network-support:
+    path: ../esp-network-support
+  esp-support:
+    path: ../esp-support
 files:
   exclude:
     - ".github"
