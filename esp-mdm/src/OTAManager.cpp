@@ -42,9 +42,9 @@ void OTAManager::update_check() {
 
 bool OTAManager::install_update() {
     auto update_partition = esp_ota_get_next_update_partition(nullptr);
-    ESP_ERROR_ASSERT(update_partition);
+    ESP_ASSERT_CHECK(update_partition);
     auto running_partition = esp_ota_get_running_partition();
-    ESP_ERROR_ASSERT(running_partition);
+    ESP_ASSERT_CHECK(running_partition);
 
     OTAConfig ota_config = {
         .endpoint = CONFIG_OTA_ENDPOINT,
@@ -81,7 +81,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
     auto client = esp_http_client_init(&config);
 
-    ESP_ERROR_CHECK_JUMP(esp_http_client_open(client, 0), end);
+    ESP_ERROR_JUMP(esp_http_client_open(client, 0), end);
 
     esp_http_client_fetch_headers(client);
 
@@ -145,7 +145,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
             if (last_invalid_app != nullptr) {
                 esp_app_desc_t invalid_app_info;
-                ESP_ERROR_CHECK_JUMP(esp_ota_get_partition_description(last_invalid_app, &invalid_app_info), end);
+                ESP_ERROR_JUMP(esp_ota_get_partition_description(last_invalid_app, &invalid_app_info), end);
 
                 ESP_LOGI(TAG, "Last invalid firmware version: %s", invalid_app_info.version);
 
@@ -169,14 +169,14 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
             ((esp_partition_t*)ota_config.update_partition)->subtype = update_partition_subtype;
 
-            ESP_ERROR_CHECK_JUMP(err, end);
+            ESP_ERROR_JUMP(err, end);
 
             ota_busy = true;
 
             ESP_LOGI(TAG, "Downloading new firmware");
         }
 
-        ESP_ERROR_CHECK_JUMP(esp_ota_write(update_handle, (const void*)buffer, read), end);
+        ESP_ERROR_JUMP(esp_ota_write(update_handle, (const void*)buffer, read), end);
 
         firmware_size += read;
 
@@ -188,7 +188,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
         goto end;
     }
 
-    ESP_ERROR_CHECK_JUMP(esp_ota_end(update_handle), end);
+    ESP_ERROR_JUMP(esp_ota_end(update_handle), end);
 
     ota_busy = false;
     firmware_installed = true;

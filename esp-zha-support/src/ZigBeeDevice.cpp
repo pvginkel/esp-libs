@@ -16,7 +16,7 @@ extern "C" void zb_set_ed_node_descriptor(bool power_src, bool rx_on_when_idle, 
 static bool edBatteryPowered = false;
 
 ZigBeeDevice::ZigBeeDevice() {
-    ESP_ERROR_ASSERT(!APP_INSTANCE);
+    ESP_ASSERT_CHECK(!APP_INSTANCE);
 
     APP_INSTANCE = this;
 
@@ -158,14 +158,14 @@ esp_zb_host_config_t ZigBeeDevice::getHostConfig() { return _host_config; }
 void ZigBeeDevice::setPrimaryChannelMask(uint32_t mask) { _primary_channel_mask = mask; }
 
 void ZigBeeDevice::setScanDuration(uint8_t duration) {
-    ESP_ERROR_ASSERT(duration >= 1 && duration <= 4);
+    ESP_ASSERT_CHECK(duration >= 1 && duration <= 4);
     _scan_duration = duration;
 }
 
 void ZigBeeDevice::setRebootOpenNetwork(uint8_t time) { _open_network = time; }
 
 void ZigBeeDevice::openNetwork(uint8_t time) {
-    ESP_ERROR_ASSERT(started());
+    ESP_ASSERT_CHECK(started());
 
     ESP_LOGI(TAG, "Opening network for joining for %d seconds", time);
 

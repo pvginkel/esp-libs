@@ -46,7 +46,7 @@ void ApplicationBase::begin_network() {
         }
     });
 
-    _network_connection.begin(CONFIG_WIFI_PASSWORD);
+    ESP_ERROR_CHECK(_network_connection.begin(CONFIG_WIFI_PASSWORD));
 }
 
 void ApplicationBase::begin_network_available() {

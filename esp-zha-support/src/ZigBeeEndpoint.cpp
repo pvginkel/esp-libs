@@ -45,7 +45,7 @@ ZigBeeAttributeU16 *ZigBeeEndpoint::createAttributeU16(uint16_t cluster_id, uint
 }
 
 void ZigBeeEndpoint::setBatteryPercentage(uint8_t percentage) {
-    ESP_ERROR_ASSERT(_battery_percentage_remaining);
+    ESP_ASSERT_CHECK(_battery_percentage_remaining);
 
     // 100% = 200 in decimal, 0% = 0
     // Convert percentage to 0-200 range

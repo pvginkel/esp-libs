@@ -170,7 +170,7 @@ void MQTTConnection::handle_connected() {
 
 void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
     // We don't support message chunking.
-    ESP_ERROR_ASSERT(!event->current_data_offset);
+    ESP_ASSERT_CHECK(!event->current_data_offset);
 
     if (!event->topic_len) {
         ESP_LOGW(TAG, "Handling data without topic");
@@ -208,13 +208,13 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
 void MQTTConnection::subscribe(const std::string& topic) {
     ESP_LOGI(TAG, "Subscribing to topic %s", topic.c_str());
 
-    ESP_ERROR_ASSERT(esp_mqtt_client_subscribe(_client, topic.c_str(), 0) >= 0);
+    ESP_ASSERT_CHECK(esp_mqtt_client_subscribe(_client, topic.c_str(), 0) >= 0);
 }
 
 void MQTTConnection::unsubscribe(const std::string& topic) {
     ESP_LOGI(TAG, "Unsubscribing from topic %s", topic.c_str());
 
-    ESP_ERROR_ASSERT(esp_mqtt_client_unsubscribe(_client, topic.c_str()) >= 0);
+    ESP_ASSERT_CHECK(esp_mqtt_client_unsubscribe(_client, topic.c_str()) >= 0);
 }
 
 void MQTTConnection::publish_configuration() {
@@ -238,7 +238,7 @@ void MQTTConnection::publish_configuration() {
 void MQTTConnection::publish_json(cJSON* root, const std::string& topic, bool retain) {
     auto json = cJSON_PrintUnformatted(root);
 
-    ESP_ERROR_ASSERT(esp_mqtt_client_publish(_client, topic.c_str(), json, 0, QOS_MIN_ONE, retain) >= 0);
+    ESP_ASSERT_CHECK(esp_mqtt_client_publish(_client, topic.c_str(), json, 0, QOS_MIN_ONE, retain) >= 0);
 
     cJSON_free(json);
 }
@@ -397,7 +397,7 @@ bool MQTTConnection::handle_discovery_prune(const std::string& topic) {
     }
 
     ESP_LOGI(TAG, "Pruning stale discovery topic %s", topic.c_str());
-    ESP_ERROR_ASSERT(esp_mqtt_client_publish(_client, topic.c_str(), "", 0, QOS_MIN_ONE, true) >= 0);
+    ESP_ASSERT_CHECK(esp_mqtt_client_publish(_client, topic.c_str(), "", 0, QOS_MIN_ONE, true) >= 0);
 
     return true;
 }
@@ -414,7 +414,7 @@ std::string MQTTConnection::get_firmware_version() {
 void MQTTConnection::send_state(cJSON* data) {
     ESP_LOGI(TAG, "Publishing new state");
 
-    ESP_ERROR_ASSERT(_client);
+    ESP_ASSERT_CHECK(_client);
 
     cJSON_AddBoolToObject(data, "online", true);
 

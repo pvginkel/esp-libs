@@ -222,7 +222,7 @@ void ACS725::process_samples(const uint8_t* buffer, uint32_t len) {
                          "standard deviation %.3fmv",
                          result.success ? "YES" : "NO", _zero_mv, _noise_floor_a, NOISE_FLOOR, result.final_std_dev);
 
-                ESP_ERROR_ASSERT(result.success);
+                ESP_ASSERT_CHECK(result.success);
 
                 save_state();
 

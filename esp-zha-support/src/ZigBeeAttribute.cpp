@@ -32,7 +32,7 @@ esp_zb_zcl_attr_t* ZigBeeAttribute::doGet() {
         esp_zb_zcl_get_attribute(_endpoint_id, _cluster_id, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, _attribute_id);
     if (!attr) {
         ESP_LOGE(TAG, "Cannot find attribute with cluster %" PRIu16 " ID %" PRIu16, _cluster_id, _attribute_id);
-        ESP_ERROR_ASSERT(attr);
+        ESP_ASSERT_CHECK(attr);
     }
     return attr;
 }
@@ -46,7 +46,7 @@ void ZigBeeAttribute::doSet(void* buffer) {
 
 uint8_t ZigBeeAttributeU8::get() {
     const auto data_p = (uint8_t*)doGet()->data_p;
-    ESP_ERROR_ASSERT(data_p);
+    ESP_ASSERT_CHECK(data_p);
     return *data_p;
 }
 
@@ -57,7 +57,7 @@ uint8_t ZigBeeAttributeU8::get(uint8_t default_value) {
 
 uint16_t ZigBeeAttributeU16::get() {
     const auto data_p = (uint16_t*)doGet()->data_p;
-    ESP_ERROR_ASSERT(data_p);
+    ESP_ASSERT_CHECK(data_p);
     return *data_p;
 }
 

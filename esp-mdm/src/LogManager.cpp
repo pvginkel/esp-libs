@@ -59,10 +59,7 @@ esp_err_t LogManager::begin() {
         .name = "logManagerTimer",
     };
 
-    auto err = esp_timer_create(&displayOffTimerArgs, &_log_timer);
-    if (err != ESP_OK) {
-        return err;
-    }
+    ESP_ERROR_RETURN(esp_timer_create(&displayOffTimerArgs, &_log_timer));
 
     esp_register_shutdown_handler([]() {
         if (_instance) {

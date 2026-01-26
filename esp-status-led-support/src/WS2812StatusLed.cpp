@@ -100,7 +100,7 @@ void WS2812StatusLed::config_changed() {
 
         case StatusLedMode::Blinking:
         case StatusLedMode::Pulsating:
-            ESP_ERROR_ASSERT(period > 0);
+            ESP_ASSERT_CHECK(period > 0);
 
             // Force immediate update on next cycle
             _next_update_ms = 1;

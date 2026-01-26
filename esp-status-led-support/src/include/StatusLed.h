@@ -37,7 +37,7 @@ class BrightnessStatusLed : public virtual StatusLed {
 
 public:
     void set_brightness(float brightness) {
-        ESP_ERROR_ASSERT(brightness >= 0.0f && brightness <= 1.0f);
+        ESP_ASSERT_CHECK(brightness >= 0.0f && brightness <= 1.0f);
 
         _brightness = brightness;
 
