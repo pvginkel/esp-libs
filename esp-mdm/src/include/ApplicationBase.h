@@ -18,6 +18,12 @@ class ApplicationBase {
     Callback<void> _begin;
     Callback<void> _network_available;
     Callback<void> _ready;
+    std::string _access_token;
+    std::string _authorization;
+    uint32_t _token_expires_at{};
+    std::string _device_name;
+    std::string _device_entity_id;
+    bool _enable_ota{};
 
 public:
     ApplicationBase();
@@ -38,5 +44,7 @@ private:
     esp_err_t setup_flash();
     void begin_network();
     void begin_network_available();
+    esp_err_t ensure_access_token();
+    esp_err_t load_device_configuration();
     void begin_after_initialization();
 };

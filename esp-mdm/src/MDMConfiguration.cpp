@@ -4,7 +4,7 @@
 
 #include <nvs.h>
 
-#include "Defer.h"
+#include "defer.h"
 
 #define NVS_NAMESPACE "prov"
 
@@ -33,6 +33,11 @@ esp_err_t MDMConfiguration::load() {
     ESP_ERROR_RETURN(nvs_get_string(handle, "mqtt_url", _mqtt_url));
     ESP_ERROR_RETURN(nvs_get_string(handle, "wifi_ssid", _wifi_ssid));
     ESP_ERROR_RETURN(nvs_get_string(handle, "wifi_password", _wifi_password));
+    ESP_ERROR_RETURN(nvs_get_string(handle, "logging_url", _logging_url));
+
+    if (!_base_url.ends_with('/')) {
+        _base_url += '/';
+    }
 
     return ESP_OK;
 }

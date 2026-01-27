@@ -1,9 +1,10 @@
+#include "support.h"
+
 #include "OTAManager.h"
 
 #include "esp_app_format.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
-#include "support.h"
 
 // TODO: REMOVE
 #define CONFIG_OTA_CHECK_INTERVAL 15
@@ -74,7 +75,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
     esp_http_client_config_t config = {
         .url = ota_config.endpoint,
-        .timeout_ms = CONFIG_MDM_OTA_RECV_TIMEOUT,
+        .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
     };
 
     ESP_LOGI(TAG, "Getting firmware from '%s'", config.url);

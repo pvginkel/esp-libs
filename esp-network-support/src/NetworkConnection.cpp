@@ -8,9 +8,6 @@
 #include "sdkconfig.h"
 #include "strformat.h"
 
-// TODO: REMOVE!
-#define CONFIG_WIFI_SSID "Thing-Fish"
-
 LOG_TAG(NetworkConnection);
 
 NetworkConnection* NetworkConnection::_instance = nullptr;
@@ -19,7 +16,7 @@ NetworkConnection::NetworkConnection(Queue* synchronizationQueue) : _synchroniza
     _instance = this;
 }
 
-esp_err_t NetworkConnection::begin(const char* password) {
+esp_err_t NetworkConnection::begin(const char* ssid, const char* password) {
     _wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_RETURN(esp_netif_init());
@@ -51,8 +48,6 @@ esp_err_t NetworkConnection::begin(const char* password) {
     wifi_config_t wifiConfig = {
         .sta =
             {
-                .ssid = CONFIG_WIFI_SSID,
-
                 // Authmode threshold resets to WPA2 as default if password
                 // matches WPA2 standards (pasword len => 8). If you want to
                 // connect the device to deprecated WEP/WPA networks, Please set
@@ -69,6 +64,7 @@ esp_err_t NetworkConnection::begin(const char* password) {
             },
     };
 
+    strcpy((char*)wifiConfig.sta.ssid, ssid);
     strcpy((char*)wifiConfig.sta.password, password);
 
     ESP_ERROR_RETURN(esp_wifi_set_mode(WIFI_MODE_STA));

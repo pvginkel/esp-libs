@@ -1,14 +1,14 @@
 menu "Network Configuration"
 
-    config ENABLE_SNTP
+    config NETWORK_ENABLE_SNTP
         bool "Enable SNTP"
         default n
 
-    config WIFI_CONNECT_ATTEMPTS
+    config NETWORK_WIFI_CONNECT_ATTEMPTS
         int "WiFi connection attempts"
         default 5
 
-    config WIFI_MAX_TX_POWER
+    config NETWORK_WIFI_MAX_TX_POWER
         int "WiFi max transmission power"
         default 0
 
@@ -16,16 +16,8 @@ menu "Network Configuration"
             When set to 0, the default will be used. If you want a sane "low"
             power setting, 44 will suffice. This translates to 11 Db.
 
-endmenu
-
-menu "Logging Configuration"
-
-    config LOG_INTERVAL
-        int "Interval to upload log messages in ms"
-        default 5000
-
-    config LOG_RECV_TIMEOUT
-        int "Logging receive timeout in ms"
+    config NETWORK_RECEIVE_TIMEOUT
+        int "Network receive timeout in ms"
         default 15000
 
 endmenu

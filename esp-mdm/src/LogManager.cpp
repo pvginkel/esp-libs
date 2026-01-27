@@ -4,9 +4,6 @@
 
 #include "cJSON.h"
 
-// TODO: REMOVE
-#define CONFIG_LOG_ENDPOINT "http://iotlogging.home/"
-
 constexpr auto BUFFER_SIZE = 1024;
 constexpr auto BLOCK_SIZE = 10;
 constexpr auto MAX_MESSAGES = 100;
@@ -50,7 +47,8 @@ int LogManager::log_handler(const char* message, va_list va) {
 
 LogManager::LogManager() { _instance = this; }
 
-esp_err_t LogManager::begin() {
+esp_err_t LogManager::begin(const std::string& logging_url) {
+    _logging_url = logging_url;
     _default_log_handler = esp_log_set_vprintf(log_handler);
 
     const esp_timer_create_args_t displayOffTimerArgs = {
@@ -131,8 +129,8 @@ void LogManager::upload_logs() {
         }
 
         esp_http_client_config_t config = {
-            .url = CONFIG_LOG_ENDPOINT,
-            .timeout_ms = CONFIG_LOG_RECV_TIMEOUT,
+            .url = _logging_url.c_str(),
+            .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
         };
 
         auto err = esp_http_upload_string(config, buffer.c_str());

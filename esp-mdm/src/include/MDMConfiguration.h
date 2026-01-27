@@ -13,6 +13,7 @@ class MDMConfiguration {
     std::string _mqtt_url;
     std::string _wifi_ssid;
     std::string _wifi_password;
+    std::string _logging_url;
 
 public:
     esp_err_t load();
@@ -25,4 +26,5 @@ public:
     const std::string& get_mqtt_url() const { return _mqtt_url; }
     const std::string& get_wifi_ssid() const { return _wifi_ssid; }
     const std::string& get_wifi_password() const { return _wifi_password; }
+    const std::string& get_logging_url() const { return _logging_url; }
 };

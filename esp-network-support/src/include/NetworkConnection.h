@@ -17,22 +17,22 @@ struct NetworkConnectionState {
 };
 
 class NetworkConnection {
-    static NetworkConnection *_instance;
-    Queue *_synchronization_queue;
+    static NetworkConnection* _instance;
+    Queue* _synchronization_queue;
     EventGroupHandle_t _wifi_event_group;
     Callback<NetworkConnectionState> _state_changed;
     int _attempt{};
     bool _have_sntp_synced{};
-    esp_netif_t *_wifi_interface{};
+    esp_netif_t* _wifi_interface{};
 
 public:
-    NetworkConnection(Queue *synchronizationQueue);
+    NetworkConnection(Queue* synchronizationQueue);
 
-    esp_err_t begin(const char *password);
+    esp_err_t begin(const char* ssid, const char* password);
     void on_state_changed(std::function<void(NetworkConnectionState)> func) { _state_changed.add(func); }
     std::string get_ip_address();
 
 private:
-    void event_handler(esp_event_base_t eventBase, int32_t eventId, void *eventData);
+    void event_handler(esp_event_base_t eventBase, int32_t eventId, void* eventData);
     void setup_sntp();
 };

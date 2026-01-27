@@ -1,19 +1,69 @@
 #include "support.h"
 
-esp_err_t esp_http_upload_string(const esp_http_client_config_t& config, const char* const data) {
-    auto err = ESP_OK;
+#include <memory>
 
+LOG_TAG(support);
+
+esp_err_t esp_http_download_string(const esp_http_client_config_t& config, std::string& target, size_t max_length,
+                                   const char* authorization) {
     auto client = esp_http_client_init(&config);
+    DEFER(esp_http_client_cleanup(client));
 
-    esp_http_client_set_method(client, HTTP_METHOD_POST);
-    esp_http_client_set_post_field(client, data, strlen(data));
+    if (authorization) {
+        ESP_ERROR_RETURN(esp_http_client_set_header(client, "Authorization", authorization));
+    }
 
-    err = esp_http_client_perform(client);
+    ESP_ERROR_RETURN(esp_http_client_open(client, 0));
 
-    esp_http_client_close(client);
-    esp_http_client_cleanup(client);
+    const auto length = esp_http_client_fetch_headers(client);
+    if (length < 0) {
+        ESP_ERROR_RETURN(-length);
+    }
 
-    return err;
+    return esp_http_get_response(client, target, max_length);
+}
+
+esp_err_t esp_http_get_response(esp_http_client_handle_t client, std::string& target, size_t max_length) {
+    target.clear();
+
+    constexpr size_t BUFFER_SIZE = 1024;
+    const auto bufferSize = max_length > 0 ? std::min(max_length + 1, BUFFER_SIZE) : BUFFER_SIZE;
+
+    auto buffer = std::make_unique<char[]>(bufferSize);
+    int64_t length = 0;
+
+    while (true) {
+        auto read = esp_http_client_read(client, buffer.get(), bufferSize);
+        if (read < 0) {
+            ESP_ERROR_RETURN(-read);
+        }
+        if (read == 0) {
+            break;
+        }
+
+        if (max_length > 0 && target.length() + read > max_length) {
+            ESP_ERROR_RETURN(ESP_ERR_INVALID_SIZE);
+        }
+
+        target.append(buffer.get(), read);
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t esp_http_upload_string(const esp_http_client_config_t& config, const char* const data,
+                                 const char* content_type) {
+    auto client = esp_http_client_init(&config);
+    DEFER(esp_http_client_cleanup(client));
+
+    ESP_ERROR_RETURN(esp_http_client_set_method(client, HTTP_METHOD_POST));
+    ESP_ERROR_RETURN(esp_http_client_set_post_field(client, data, strlen(data)));
+
+    if (content_type) {
+        ESP_ERROR_RETURN(esp_http_client_set_header(client, "Content-Type", content_type));
+    }
+
+    return esp_http_client_perform(client);
 }
 
 int hextoi(char c) {
