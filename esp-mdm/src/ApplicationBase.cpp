@@ -2,11 +2,15 @@
 
 #include "ApplicationBase.h"
 
+#include "OTAManager.h"
 #include "cJSON.h"
 #include "driver/i2c.h"
+#include "http_support.h"
 #include "nvs_flash.h"
 
-#define DEVICE_CONFIGURATION_URL "api/oit/config"
+#define DEVICE_CONFIGURATION_URL "api/iot/config"
+#define DEVICE_PROVISIONING_URL "api/iot/provisioning"
+#define DEVICE_FIRMWARE_URL "api/iot/firmware"
 
 LOG_TAG(ApplicationBase);
 
@@ -54,15 +58,15 @@ void ApplicationBase::begin_network() {
 }
 
 void ApplicationBase::begin_network_available() {
+    ESP_LOGI(TAG, "Checking for firmware update");
+
+    ESP_ERROR_CHECK(install_firmware_update());
+
     ESP_LOGI(TAG, "Getting device configuration");
 
     ESP_ERROR_CHECK(load_device_configuration());
 
     _log_manager.set_device_entity_id(_device_entity_id.c_str());
-
-    if (_enable_ota) {
-        _ota_manager.begin();
-    }
 
     ESP_LOGI(TAG, "Configuration loaded; signalling network available");
 
@@ -148,6 +152,28 @@ esp_err_t ApplicationBase::ensure_access_token() {
     return ESP_OK;
 }
 
+esp_err_t ApplicationBase::install_firmware_update() {
+    if (!_enable_ota) {
+        ESP_LOGI(TAG, "OTA disabled.");
+        return ESP_OK;
+    }
+
+    const auto firmware_url = _mdm_configuration.get_base_url() + DEVICE_FIRMWARE_URL;
+
+    ESP_LOGI(TAG, "Getting firmware update %s", firmware_url.c_str());
+
+    ESP_ERROR_RETURN(ensure_access_token());
+
+    OTAManager ota_manager;
+
+    if (ota_manager.install_update(firmware_url, _authorization)) {
+        ESP_LOGI(TAG, "New firmware installed. Restarting the device.");
+        esp_restart();
+    }
+
+    return ESP_OK;
+}
+
 esp_err_t ApplicationBase::load_device_configuration() {
     const auto url = _mdm_configuration.get_base_url() + DEVICE_CONFIGURATION_URL;
     esp_http_client_config_t config = {
@@ -226,26 +252,76 @@ void ApplicationBase::setup_mqtt_subscriptions() {
 
     _mqtt_connection.subscribe("iotsupport/updates/firmware",
                                [this](const std::string& data) { handle_iotsupport_update(data, "firmware"); });
+
+    _mqtt_connection.subscribe("iotsupport/updates/provisioning", [this](const std::string& data) {
+        if (!is_iotsupport_message_for_us(data, "provisioning")) {
+            return;
+        }
+
+        auto err = handle_iotsupport_provisioning();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Provisioning failed: %s", esp_err_to_name(err));
+            return;
+        }
+
+        ESP_LOGI(TAG, "Provisioning complete; restarting");
+        esp_restart();
+    });
 }
 
-void ApplicationBase::handle_iotsupport_update(const std::string& data, const char* update_type) {
+bool ApplicationBase::is_iotsupport_message_for_us(const std::string& data, const char* message_type) {
     auto json = cJSON_Parse(data.c_str());
     if (!json) {
-        ESP_LOGE(TAG, "Failed to parse %s update JSON", update_type);
-        return;
+        ESP_LOGE(TAG, "Failed to parse %s message JSON", message_type);
+        return false;
     }
     DEFER(cJSON_Delete(json));
 
     auto client_id_item = cJSON_GetObjectItemCaseSensitive(json, "client_id");
     if (!cJSON_IsString(client_id_item) || !client_id_item->valuestring) {
-        ESP_LOGE(TAG, "Cannot get client_id from %s update", update_type);
-        return;
+        ESP_LOGE(TAG, "Cannot get client_id from %s message", message_type);
+        return false;
     }
 
-    if (_mdm_configuration.get_client_id() == client_id_item->valuestring) {
+    return _mdm_configuration.get_client_id() == client_id_item->valuestring;
+}
+
+void ApplicationBase::handle_iotsupport_update(const std::string& data, const char* update_type) {
+    if (is_iotsupport_message_for_us(data, update_type)) {
         ESP_LOGI(TAG, "Received %s update for this device; restarting", update_type);
         esp_restart();
     }
+}
+
+esp_err_t ApplicationBase::handle_iotsupport_provisioning() {
+    ESP_ERROR_RETURN(ensure_access_token());
+
+    const auto url = _mdm_configuration.get_base_url() + DEVICE_PROVISIONING_URL;
+    esp_http_client_config_t config = {
+        .url = url.c_str(),
+        .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
+    };
+
+    ESP_LOGI(TAG, "Getting provisioning data from %s", config.url);
+
+    auto client = esp_http_client_init(&config);
+    DEFER(esp_http_client_cleanup(client));
+
+    ESP_ERROR_RETURN(esp_http_client_set_header(client, "Authorization", _authorization.c_str()));
+    ESP_ERROR_RETURN(esp_http_client_open(client, 0));
+
+    auto length = esp_http_client_fetch_headers(client);
+    if (length < 0) {
+        return (esp_err_t)-length;
+    }
+
+    cJSON* provisioning_data = nullptr;
+    ESP_ERROR_RETURN(esp_http_get_json(client, provisioning_data, 128 * 1024));
+    DEFER(cJSON_Delete(provisioning_data));
+
+    ESP_ERROR_RETURN(_mdm_configuration.save_provisioning(provisioning_data));
+
+    return ESP_OK;
 }
 
 void ApplicationBase::process() {

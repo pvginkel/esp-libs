@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "cJSON.h"
 #include "esp_err.h"
 
 class MDMConfiguration {
@@ -17,6 +18,7 @@ class MDMConfiguration {
 
 public:
     esp_err_t load();
+    esp_err_t save_provisioning(cJSON* data);
 
     const std::string& get_device_key() const { return _device_key; }
     const std::string& get_client_id() const { return _client_id; }

@@ -6,47 +6,20 @@
 #include "esp_log.h"
 #include "sdkconfig.h"
 
-#define OTA_INITIAL_CHECK_INTERVAL 5
 #define HASH_LENGTH 32  // SHA-256 hash length
 #define BUFFER_SIZE 1024
-#define DEVICE_FIRMWARE_URL "api/oit/firmware"
-#define DEVICE_FIRMWARE_VERSION_URL "api/oit/firmware_version"
 
 LOG_TAG(OTAManager);
 
-OTAManager::OTAManager() : _update_timer(nullptr) {}
-
-void OTAManager::begin() {
-    const esp_timer_create_args_t displayOffTimerArgs = {
-        .callback = [](void* arg) { ((OTAManager*)arg)->update_check(); },
-        .arg = this,
-        .name = "updateTimer",
-    };
-
-    ESP_ERROR_CHECK(esp_timer_create(&displayOffTimerArgs, &_update_timer));
-    ESP_ERROR_CHECK(esp_timer_start_once(_update_timer, ESP_TIMER_SECONDS(OTA_INITIAL_CHECK_INTERVAL)));
-    ESP_LOGI(TAG, "Started OTA timer");
-}
-
-void OTAManager::update_check() {
-    if (install_update()) {
-        ESP_LOGI(TAG, "Firmware installed successfully; restarting system");
-
-        esp_restart();
-        return;
-    }
-
-    ESP_ERROR_CHECK(esp_timer_start_once(_update_timer, ESP_TIMER_SECONDS(CONFIG_MDM_OTA_CHECK_INTERVAL)));
-}
-
-bool OTAManager::install_update() {
+bool OTAManager::install_update(const std::string& firmware_url, const std::string& authorization) {
     auto update_partition = esp_ota_get_next_update_partition(nullptr);
     ESP_ASSERT_CHECK(update_partition);
     auto running_partition = esp_ota_get_running_partition();
     ESP_ASSERT_CHECK(running_partition);
 
     OTAConfig ota_config = {
-        .endpoint = CONFIG_OTA_ENDPOINT,
+        .endpoint = firmware_url.c_str(),
+        .authorization = authorization.c_str(),
         .update_partition = update_partition,
         .running_partition = running_partition,
         .check_only = false,
@@ -67,7 +40,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
     auto firmware_installed = false;
     auto ota_busy = false;
 
-    auto buffer = new char[BUFFER_SIZE];
+    auto buffer = std::make_unique<char[]>(BUFFER_SIZE);
     auto firmware_size = 0;
     esp_ota_handle_t update_handle = 0;
 
@@ -79,13 +52,19 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
     ESP_LOGI(TAG, "Getting firmware from '%s'", config.url);
 
     auto client = esp_http_client_init(&config);
+    DEFER(esp_http_client_cleanup(client));
 
-    ESP_ERROR_JUMP(esp_http_client_open(client, 0), end);
+    ESP_ERROR_RETURN(esp_http_client_set_header(client, "Authorization", ota_config.authorization));
 
-    esp_http_client_fetch_headers(client);
+    ESP_ERROR_RETURN(esp_http_client_open(client, 0));
+
+    auto length = esp_http_client_fetch_headers(client);
+    if (length < 0) {
+        return (esp_err_t)-length;
+    }
 
     while (true) {
-        auto read = esp_http_client_read(client, buffer, BUFFER_SIZE);
+        auto read = esp_http_client_read(client, buffer.get(), BUFFER_SIZE);
 
         if (read < 0) {
             ESP_LOGE(TAG, "Error while reading from HTTP stream");
@@ -117,7 +96,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
             // check current version with downloading
             esp_app_desc_t new_app_info;
-            memcpy(&new_app_info, &buffer[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)],
+            memcpy(&new_app_info, &buffer.get()[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)],
                    sizeof(esp_app_desc_t));
 
             esp_app_desc_t running_app_info;
@@ -175,7 +154,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
             ESP_LOGI(TAG, "Downloading new firmware");
         }
 
-        ESP_ERROR_JUMP(esp_ota_write(update_handle, (const void*)buffer, read), end);
+        ESP_ERROR_JUMP(esp_ota_write(update_handle, (const void*)buffer.get(), read), end);
 
         firmware_size += read;
 
@@ -196,11 +175,6 @@ end:
     if (ota_busy) {
         esp_ota_abort(update_handle);
     }
-
-    delete[] buffer;
-
-    esp_http_client_close(client);
-    esp_http_client_cleanup(client);
 
     return firmware_installed;
 }

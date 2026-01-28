@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "cJSON.h"
 #include "esp_http_client.h"
 

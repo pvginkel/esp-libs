@@ -1,7 +1,5 @@
 #include "support.h"
 
-#include <memory>
-
 #include "esp_http_client.h"
 
 LOG_TAG(support);

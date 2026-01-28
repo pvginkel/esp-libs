@@ -41,3 +41,28 @@ esp_err_t MDMConfiguration::load() {
 
     return ESP_OK;
 }
+
+esp_err_t MDMConfiguration::save_provisioning(cJSON* data) {
+    // Validate that all items are strings.
+    for (auto item = data->child; item != nullptr; item = item->next) {
+        if (!cJSON_IsString(item) || !item->valuestring) {
+            ESP_LOGE(TAG, "Provisioning data contains non-string value for key '%s'", item->string);
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    nvs_handle_t handle;
+    ESP_ERROR_RETURN(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle));
+    DEFER(nvs_close(handle));
+
+    for (auto item = data->child; item != nullptr; item = item->next) {
+        ESP_LOGI(TAG, "Writing provisioning key '%s'", item->string);
+        ESP_ERROR_RETURN(nvs_set_str(handle, item->string, item->valuestring));
+    }
+
+    ESP_ERROR_RETURN(nvs_commit(handle));
+
+    ESP_LOGI(TAG, "Provisioning data saved successfully");
+
+    return ESP_OK;
+}

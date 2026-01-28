@@ -2,6 +2,8 @@
 
 #include "http_support.h"
 
+LOG_TAG(http_support);
+
 esp_err_t esp_http_get_response(esp_http_client_handle_t client, std::string& target, size_t max_length) {
     target.clear();
 
@@ -33,8 +35,8 @@ esp_err_t esp_http_get_json(esp_http_client_handle_t client, cJSON*& data, size_
     std::string json;
     ESP_ERROR_RETURN(esp_http_get_response(client, json, max_length));
 
-    const auto data = cJSON_Parse(json.c_str());
+    data = cJSON_Parse(json.c_str());
     ESP_RETURN_ON_FALSE(data, ESP_ERR_INVALID_ARG, TAG, "Failed to parse JSON");
 
-    return data;
+    return ESP_OK;
 }

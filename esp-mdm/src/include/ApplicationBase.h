@@ -5,13 +5,11 @@
 #include "MDMConfiguration.h"
 #include "MQTTConnection.h"
 #include "NetworkConnection.h"
-#include "OTAManager.h"
 #include "Queue.h"
 
 class ApplicationBase {
     NetworkConnection _network_connection;
     MQTTConnection _mqtt_connection;
-    OTAManager _ota_manager;
     Queue _queue;
     LogManager _log_manager;
     MDMConfiguration _mdm_configuration;
@@ -52,9 +50,12 @@ private:
     void begin_network();
     void begin_network_available();
     esp_err_t ensure_access_token();
+    esp_err_t install_firmware_update();
     esp_err_t load_device_configuration();
     esp_err_t parse_device_configuration(cJSON* data);
     void setup_mqtt_subscriptions();
+    bool is_iotsupport_message_for_us(const std::string& data, const char* message_type);
     void handle_iotsupport_update(const std::string& data, const char* update_type);
+    esp_err_t handle_iotsupport_provisioning();
     void begin_after_initialization();
 };
