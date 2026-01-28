@@ -23,6 +23,6 @@ public:
     bool install_update(const std::string& firmware_url, const std::string& authorization);
 
 private:
-    bool install_firmware(OTAConfig& ota_config);
+    esp_err_t install_firmware(OTAConfig& ota_config, bool& firmware_installed);
     bool parse_hash(char* buffer, uint8_t* hash);
 };

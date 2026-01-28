@@ -4,7 +4,7 @@
 
 #include "esp_timer.h"
 
-static uint32_t millis() { return esp_timer_get_time() / 1000; }
+static uint32_t millis() { return uint32_t(esp_timer_get_time() / 1000ll); }
 
 //////////////
 // DEBOUNCE //
@@ -112,7 +112,7 @@ bool Debouncer::fell() const { return !getStateFlag(DEBOUNCED_STATE) && getState
 Bounce::Bounce() : pin(0), inverted(false) {}
 
 void Bounce::attach(int pin) {
-    this->pin = pin;
+    this->pin = uint8_t(pin);
 
     // SET INITIAL STATE
     begin();

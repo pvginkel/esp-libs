@@ -16,7 +16,7 @@
 #define ESP_TIMER_MS(v) ((v) * 1000)
 #define ESP_TIMER_SECONDS(v) ESP_TIMER_MS((v) * 1000)
 
-#define esp_get_millis() uint32_t(esp_timer_get_time() / 1000ull)
+#define esp_get_millis() (esp_timer_get_time() / 1000ll)
 
 esp_err_t esp_http_get_response(esp_http_client_handle_t client, std::string& target, size_t max_length);
 esp_err_t esp_http_download_string(const esp_http_client_config_t& config, std::string& target, size_t max_length = 0,

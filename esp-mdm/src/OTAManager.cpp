@@ -25,7 +25,9 @@ bool OTAManager::install_update(const std::string& firmware_url, const std::stri
         .check_only = false,
     };
 
-    if (install_firmware(ota_config)) {
+    bool firmware_installed = false;
+    ESP_ERROR_CHECK(install_firmware(ota_config, firmware_installed));
+    if (firmware_installed) {
         ESP_LOGI(TAG, "App update installed; restarting");
 
         ESP_ERROR_CHECK(esp_ota_set_boot_partition(ota_config.update_partition));
@@ -36,13 +38,18 @@ bool OTAManager::install_update(const std::string& firmware_url, const std::stri
     return false;
 }
 
-bool OTAManager::install_firmware(OTAConfig& ota_config) {
-    auto firmware_installed = false;
+esp_err_t OTAManager::install_firmware(OTAConfig& ota_config, bool& firmware_installed) {
     auto ota_busy = false;
+    esp_ota_handle_t update_handle = 0;
+
+    DEFER({
+        if (ota_busy) {
+            esp_ota_abort(update_handle);
+        }
+    });
 
     auto buffer = std::make_unique<char[]>(BUFFER_SIZE);
     auto firmware_size = 0;
-    esp_ota_handle_t update_handle = 0;
 
     esp_http_client_config_t config = {
         .url = ota_config.endpoint,
@@ -52,6 +59,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
     ESP_LOGI(TAG, "Getting firmware from '%s'", config.url);
 
     auto client = esp_http_client_init(&config);
+    ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG, "Failed to init HTTP client");
     DEFER(esp_http_client_cleanup(client));
 
     ESP_ERROR_RETURN(esp_http_client_set_header(client, "Authorization", ota_config.authorization));
@@ -65,34 +73,23 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
     while (true) {
         auto read = esp_http_client_read(client, buffer.get(), BUFFER_SIZE);
-
         if (read < 0) {
-            ESP_LOGE(TAG, "Error while reading from HTTP stream");
-            goto end;
+            ESP_ERROR_RETURN(-read);
         }
-
         if (read == 0) {
-            // As esp_http_client_read never returns negative error code, we rely on
-            // `errno` to check for underlying transport connectivity closure if any.
-
-            if (errno == ECONNRESET || errno == ENOTCONN) {
-                ESP_LOGE(TAG, "Connection closed unexpectedly, errno = %d", errno);
-                goto end;
-            } else if (esp_http_client_is_complete_data_received(client)) {
+            if (esp_http_client_is_complete_data_received(client)) {
                 ESP_LOGI(TAG, "Connection closed");
                 break;
             } else {
-                ESP_LOGE(TAG, "Stream not completely read");
-                goto end;
+                ESP_RETURN_ON_ERROR(ESP_FAIL, TAG, "Stream not completely read");
             }
         }
 
         // If this is the first block we've read, parse the header.
         if (firmware_size == 0) {
-            if (read < sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t)) {
-                ESP_LOGE(TAG, "Did not receive enough data to parse the firmware header");
-                goto end;
-            }
+            ESP_RETURN_ON_FALSE(
+                read >= sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t),
+                ESP_FAIL, TAG, "Did not receive enough data to parse the firmware header");
 
             // check current version with downloading
             esp_app_desc_t new_app_info;
@@ -107,7 +104,7 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
                 if (strcmp(new_app_info.version, running_app_info.version) == 0) {
                     ESP_LOGI(TAG, "Firmware already up to date.");
-                    goto end;
+                    return ESP_OK;
                 }
             } else {
                 ESP_LOGI(TAG, "New firmware version: %s", new_app_info.version);
@@ -115,22 +112,21 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
             if (ota_config.check_only) {
                 firmware_installed = true;
-
-                goto end;
+                return ESP_OK;
             }
 
             auto last_invalid_app = esp_ota_get_last_invalid_partition();
 
             if (last_invalid_app != nullptr) {
                 esp_app_desc_t invalid_app_info;
-                ESP_ERROR_JUMP(esp_ota_get_partition_description(last_invalid_app, &invalid_app_info), end);
+                ESP_ERROR_RETURN(esp_ota_get_partition_description(last_invalid_app, &invalid_app_info));
 
                 ESP_LOGI(TAG, "Last invalid firmware version: %s", invalid_app_info.version);
 
                 // Check current version with last invalid partition.
                 if (strcmp(invalid_app_info.version, new_app_info.version) == 0 && !ota_config.force) {
                     ESP_LOGW(TAG, "Refusing to update to invalid firmware version.");
-                    goto end;
+                    return ESP_OK;
                 }
             }
 
@@ -147,36 +143,28 @@ bool OTAManager::install_firmware(OTAConfig& ota_config) {
 
             ((esp_partition_t*)ota_config.update_partition)->subtype = update_partition_subtype;
 
-            ESP_ERROR_JUMP(err, end);
+            ESP_ERROR_RETURN(err);
 
             ota_busy = true;
 
             ESP_LOGI(TAG, "Downloading new firmware");
         }
 
-        ESP_ERROR_JUMP(esp_ota_write(update_handle, (const void*)buffer.get(), read), end);
+        ESP_ERROR_RETURN(esp_ota_write(update_handle, (const void*)buffer.get(), read));
 
         firmware_size += read;
 
         ESP_LOGD(TAG, "Written %d bytes, total %d", read, firmware_size);
     }
 
-    if (!esp_http_client_is_complete_data_received(client)) {
-        ESP_LOGE(TAG, "Stream not fully read");
-        goto end;
-    }
+    ESP_RETURN_ON_FALSE(esp_http_client_is_complete_data_received(client), ESP_FAIL, TAG, "Stream not fully read");
 
-    ESP_ERROR_JUMP(esp_ota_end(update_handle), end);
+    ESP_ERROR_RETURN(esp_ota_end(update_handle));
 
     ota_busy = false;
     firmware_installed = true;
 
-end:
-    if (ota_busy) {
-        esp_ota_abort(update_handle);
-    }
-
-    return firmware_installed;
+    return ESP_OK;
 }
 
 bool OTAManager::parse_hash(char* buffer, uint8_t* hash) {
@@ -188,7 +176,7 @@ bool OTAManager::parse_hash(char* buffer, uint8_t* hash) {
             return false;
         }
 
-        hash[i] = h << 4 | l;
+        hash[i] = uint8_t(h << 4 | l);
     }
 
     return true;

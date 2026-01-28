@@ -15,9 +15,9 @@
 class LogManager {
     struct Message {
         char* buffer;
-        uint32_t time;
+        int64_t time;
 
-        Message(char* buffer, uint32_t time) : buffer(buffer), time(time) {}
+        Message(char* buffer, int64_t time) : buffer(buffer), time(time) {}
     };
 
     static LogManager* _instance;

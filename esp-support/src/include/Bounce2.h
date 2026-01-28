@@ -199,7 +199,7 @@ public:
 
     void setInverted(bool inverted = true) { this->inverted = inverted; }
 
-    Bounce(uint8_t pin, unsigned long interval_millis, bool inverted = false) : Bounce() {
+    Bounce(uint8_t pin, uint16_t interval_millis, bool inverted = false) : Bounce() {
         setInverted(inverted);
         interval(interval_millis);
         attach(pin);

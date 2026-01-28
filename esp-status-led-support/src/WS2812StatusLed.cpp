@@ -67,9 +67,9 @@ void WS2812StatusLed::process() {
             break;
 
         case StatusLedMode::Pulsating: {
-            const uint32_t elapsed = now - _phase_start_ms;
+            const auto elapsed = now - _phase_start_ms;
             const float phase = (float)(elapsed % period) / (float)period;
-            const float intensity = (std::sin(phase * 2.0f * M_PI - M_PI_2) + 1.0f) / 2.0f;
+            const float intensity = float((std::sin(phase * 2.0f * M_PI - M_PI_2) + 1.0f) / 2.0f);
 
             update_led(intensity);
             _next_update_ms = now + 10;  // Update every 10ms for smooth animation

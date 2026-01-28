@@ -114,7 +114,7 @@ void LogManager::upload_logs() {
             auto root = cJSON_CreateObject();
 
             cJSON_AddStringToObject(root, "message", message.buffer);
-            cJSON_AddNumberToObject(root, "relative_time", millis - message.time);
+            cJSON_AddNumberToObject(root, "relative_time", double(millis - message.time));
             cJSON_AddStringToObject(root, "entity_id", _device_entity_id);
 
             auto json = cJSON_PrintUnformatted(root);

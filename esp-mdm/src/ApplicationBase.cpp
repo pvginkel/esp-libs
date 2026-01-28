@@ -114,6 +114,7 @@ esp_err_t ApplicationBase::ensure_access_token() {
     };
 
     auto client = esp_http_client_init(&config);
+    ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG, "Failed to init HTTP client");
     DEFER(esp_http_client_cleanup(client));
 
     ESP_ERROR_RETURN(esp_http_client_set_method(client, HTTP_METHOD_POST));
@@ -123,7 +124,7 @@ esp_err_t ApplicationBase::ensure_access_token() {
 
     auto length = esp_http_client_fetch_headers(client);
     if (length < 0) {
-        ESP_ERROR_RETURN(-length);
+        ESP_ERROR_RETURN(esp_err_t(-length));
     }
 
     std::string response;
@@ -145,7 +146,7 @@ esp_err_t ApplicationBase::ensure_access_token() {
 
     _access_token = access_token_item->valuestring;
     _authorization = "Bearer " + _access_token;
-    _token_expires_at = esp_get_millis() + (uint32_t)(expires_in_item->valuedouble * 1000);
+    _token_expires_at = esp_get_millis() + int64_t(expires_in_item->valuedouble * 1000);
 
     ESP_LOGI(TAG, "Access token acquired, expires in %.0f seconds", expires_in_item->valuedouble);
 
@@ -230,7 +231,7 @@ esp_err_t ApplicationBase::parse_device_configuration(cJSON* data) {
 
     ESP_LOGI(TAG, "Enable OTA: %s", _enable_ota ? "yes" : "no");
 
-    return ERR_OK;
+    return ESP_OK;
 }
 
 void ApplicationBase::begin_after_initialization() {
@@ -305,6 +306,7 @@ esp_err_t ApplicationBase::handle_iotsupport_provisioning() {
     ESP_LOGI(TAG, "Getting provisioning data from %s", config.url);
 
     auto client = esp_http_client_init(&config);
+    ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG, "Failed to init HTTP client");
     DEFER(esp_http_client_cleanup(client));
 
     ESP_ERROR_RETURN(esp_http_client_set_header(client, "Authorization", _authorization.c_str()));

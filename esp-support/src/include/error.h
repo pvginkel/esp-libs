@@ -41,26 +41,6 @@
     } while (0)
 #endif
 
-// Jumps to label if the call fails.
-#if defined(CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT)
-#define ESP_ERROR_JUMP(x, label)           \
-    do {                                   \
-        esp_err_t err_rc_ = (x);           \
-        if (unlikely(err_rc_ != ESP_OK)) { \
-            goto label;                    \
-        }                                  \
-    } while (0)
-#else
-#define ESP_ERROR_JUMP(x, label)                                          \
-    do {                                                                  \
-        esp_err_t err_rc_ = (x);                                          \
-        if (unlikely(err_rc_ != ESP_OK)) {                                \
-            ESP_LOGE(TAG, "%s failed: %s", #x, esp_err_to_name(err_rc_)); \
-            goto label;                                                   \
-        }                                                                 \
-    } while (0)
-#endif
-
 // Asserts a condition, aborts if false.
 #if defined(CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT)
 #define ESP_ASSERT_CHECK(x)   \
