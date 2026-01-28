@@ -1,45 +1,5 @@
 #include "support.h"
 
-#include "esp_http_client.h"
-
-LOG_TAG(support);
-
-esp_err_t esp_http_download_string(const esp_http_client_config_t& config, std::string& target, size_t max_length,
-                                   const char* authorization) {
-    auto client = esp_http_client_init(&config);
-    ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG, "Failed to init HTTP client");
-    DEFER(esp_http_client_cleanup(client));
-
-    if (authorization) {
-        ESP_ERROR_RETURN(esp_http_client_set_header(client, "Authorization", authorization));
-    }
-
-    ESP_ERROR_RETURN(esp_http_client_open(client, 0));
-
-    const auto length = esp_http_client_fetch_headers(client);
-    if (length < 0) {
-        ESP_ERROR_RETURN(esp_err_t(-length));
-    }
-
-    return esp_http_get_response(client, target, max_length);
-}
-
-esp_err_t esp_http_upload_string(const esp_http_client_config_t& config, const char* const data,
-                                 const char* content_type) {
-    auto client = esp_http_client_init(&config);
-    ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG, "Failed to init HTTP client");
-    DEFER(esp_http_client_cleanup(client));
-
-    ESP_ERROR_RETURN(esp_http_client_set_method(client, HTTP_METHOD_POST));
-    ESP_ERROR_RETURN(esp_http_client_set_post_field(client, data, strlen(data)));
-
-    if (content_type) {
-        ESP_ERROR_RETURN(esp_http_client_set_header(client, "Content-Type", content_type));
-    }
-
-    return esp_http_client_perform(client);
-}
-
 int hextoi(char c) {
     if (c >= '0' && c <= '9') {
         return c - '0';

@@ -3,6 +3,7 @@
 #include "OTAManager.h"
 
 #include "esp_app_format.h"
+#include "esp_http_client.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 

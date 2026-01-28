@@ -186,11 +186,20 @@ esp_err_t ApplicationBase::load_device_configuration() {
 
     ESP_ERROR_RETURN(ensure_access_token());
 
-    std::string json;
-    ESP_ERROR_RETURN(esp_http_download_string(config, json, 128 * 1024, _authorization.c_str()));
+    auto client = esp_http_client_init(&config);
+    ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG, "Failed to init HTTP client");
+    DEFER(esp_http_client_cleanup(client));
 
-    const auto data = cJSON_Parse(json.c_str());
-    ESP_RETURN_ON_FALSE(data, ESP_ERR_INVALID_ARG, TAG, "Failed to parse JSON");
+    ESP_ERROR_RETURN(esp_http_client_set_header(client, "Authorization", _authorization.c_str()));
+    ESP_ERROR_RETURN(esp_http_client_open(client, 0));
+
+    auto length = esp_http_client_fetch_headers(client);
+    if (length < 0) {
+        ESP_ERROR_RETURN(esp_err_t(-length));
+    }
+
+    cJSON* data = nullptr;
+    ESP_ERROR_RETURN(esp_http_get_json(client, data, 128 * 1024));
     DEFER(cJSON_Delete(data));
 
     ESP_ERROR_RETURN(parse_device_configuration(data));

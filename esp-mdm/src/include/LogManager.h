@@ -39,6 +39,6 @@ public:
     void set_device_entity_id(const char* device_entity_id);
 
 private:
-    void upload_logs();
+    esp_err_t upload_logs();
     void start_timer();
 };

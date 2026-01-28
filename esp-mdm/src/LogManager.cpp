@@ -3,6 +3,7 @@
 #include "LogManager.h"
 
 #include "cJSON.h"
+#include "esp_http_client.h"
 
 constexpr auto BUFFER_SIZE = 1024;
 constexpr auto BLOCK_SIZE = 10;
@@ -82,7 +83,7 @@ void LogManager::set_device_entity_id(const char* device_entity_id) {
     }
 }
 
-void LogManager::upload_logs() {
+esp_err_t LogManager::upload_logs() {
     auto messages = _mutex.with<std::vector<Message>>([this]() {
         if (!_device_entity_id) {
             return std::vector<Message>();
@@ -96,7 +97,7 @@ void LogManager::upload_logs() {
     });
 
     std::string buffer;
-    auto offset = 0;
+    size_t offset = 0;
 
     while (offset < messages.size()) {
         buffer.clear();
@@ -133,11 +134,16 @@ void LogManager::upload_logs() {
             .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
         };
 
-        auto err = esp_http_upload_string(config, buffer.c_str());
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to upload log: %d", err);
-        }
+        auto client = esp_http_client_init(&config);
+        ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG, "Failed to init HTTP client");
+        DEFER(esp_http_client_cleanup(client));
+
+        ESP_ERROR_RETURN(esp_http_client_set_method(client, HTTP_METHOD_POST));
+        ESP_ERROR_RETURN(esp_http_client_set_post_field(client, buffer.c_str(), buffer.length()));
+        ESP_ERROR_RETURN(esp_http_client_perform(client));
     }
+
+    return ESP_OK;
 }
 
 void LogManager::start_timer() {
