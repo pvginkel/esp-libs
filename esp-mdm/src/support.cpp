@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "esp_http_client.h"
+
 LOG_TAG(support);
 
 esp_err_t esp_http_download_string(const esp_http_client_config_t& config, std::string& target, size_t max_length,
@@ -21,34 +23,6 @@ esp_err_t esp_http_download_string(const esp_http_client_config_t& config, std::
     }
 
     return esp_http_get_response(client, target, max_length);
-}
-
-esp_err_t esp_http_get_response(esp_http_client_handle_t client, std::string& target, size_t max_length) {
-    target.clear();
-
-    constexpr size_t BUFFER_SIZE = 1024;
-    const auto bufferSize = max_length > 0 ? std::min(max_length + 1, BUFFER_SIZE) : BUFFER_SIZE;
-
-    auto buffer = std::make_unique<char[]>(bufferSize);
-    int64_t length = 0;
-
-    while (true) {
-        auto read = esp_http_client_read(client, buffer.get(), bufferSize);
-        if (read < 0) {
-            ESP_ERROR_RETURN(-read);
-        }
-        if (read == 0) {
-            break;
-        }
-
-        if (max_length > 0 && target.length() + read > max_length) {
-            ESP_ERROR_RETURN(ESP_ERR_INVALID_SIZE);
-        }
-
-        target.append(buffer.get(), read);
-    }
-
-    return ESP_OK;
 }
 
 esp_err_t esp_http_upload_string(const esp_http_client_config_t& config, const char* const data,

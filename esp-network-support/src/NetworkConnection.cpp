@@ -71,11 +71,11 @@ esp_err_t NetworkConnection::begin(const char* ssid, const char* password) {
     ESP_ERROR_RETURN(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig));
     ESP_ERROR_RETURN(esp_wifi_start());
 
-    if (CONFIG_WIFI_MAX_TX_POWER) {
+    if (CONFIG_NETWORK_WIFI_MAX_TX_POWER) {
         int8_t power;
         ESP_ERROR_RETURN(esp_wifi_get_max_tx_power(&power));
 
-        const int8_t new_power = (int8_t)CONFIG_WIFI_MAX_TX_POWER;
+        const int8_t new_power = (int8_t)CONFIG_NETWORK_WIFI_MAX_TX_POWER;
 
         ESP_LOGI(TAG, "WiFi power set to %" PRIi8 " changing to %" PRIi8, power, new_power);
 
@@ -110,7 +110,7 @@ void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventI
 
         ESP_LOGW(TAG, "Disconnected from AP, reason %d", event->reason);
 
-        if (_attempt++ < CONFIG_WIFI_CONNECT_ATTEMPTS) {
+        if (_attempt++ < CONFIG_NETWORK_WIFI_CONNECT_ATTEMPTS) {
             ESP_LOGI(TAG, "Retrying...");
             esp_wifi_connect();
         } else {

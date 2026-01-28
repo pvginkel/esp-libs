@@ -68,6 +68,7 @@ class MQTTConnection {
     Callback<MQTTConnectionState> _connected_changed;
     Callback<void> _publish_discovery;
     std::map<std::string, std::function<void(const std::string&)>> _command_callbacks;
+    std::map<std::string, std::function<void(const std::string&)>> _topic_callbacks;
     std::set<std::string> _published_discovery_topics;
 
 public:
@@ -79,6 +80,7 @@ public:
     void send_state(cJSON* data);
     void on_connected_changed(std::function<void(MQTTConnectionState)> func) { _connected_changed.add(func); }
     void on_publish_discovery(std::function<void()> func) { _publish_discovery.add(func); }
+    void subscribe(const std::string& topic, std::function<void(const std::string&)> callback);
     void publish_button_discovery(MQTTDiscovery metadata, std::function<void()> command_func);
     void publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensorDiscovery component_metadata);
     void publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata,

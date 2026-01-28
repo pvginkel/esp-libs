@@ -6,13 +6,11 @@
 #include "esp_log.h"
 #include "sdkconfig.h"
 
-// TODO: REMOVE
-#define CONFIG_OTA_CHECK_INTERVAL 15
-#define CONFIG_OTA_ENDPOINT "xx"
-
-constexpr auto OTA_INITIAL_CHECK_INTERVAL = 5;
-constexpr auto HASH_LENGTH = 32;  // SHA-256 hash length
-constexpr auto BUFFER_SIZE = 1024;
+#define OTA_INITIAL_CHECK_INTERVAL 5
+#define HASH_LENGTH 32  // SHA-256 hash length
+#define BUFFER_SIZE 1024
+#define DEVICE_FIRMWARE_URL "api/oit/firmware"
+#define DEVICE_FIRMWARE_VERSION_URL "api/oit/firmware_version"
 
 LOG_TAG(OTAManager);
 
@@ -38,7 +36,7 @@ void OTAManager::update_check() {
         return;
     }
 
-    ESP_ERROR_CHECK(esp_timer_start_once(_update_timer, ESP_TIMER_SECONDS(CONFIG_OTA_CHECK_INTERVAL)));
+    ESP_ERROR_CHECK(esp_timer_start_once(_update_timer, ESP_TIMER_SECONDS(CONFIG_MDM_OTA_CHECK_INTERVAL)));
 }
 
 bool OTAManager::install_update() {

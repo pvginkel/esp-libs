@@ -140,4 +140,6 @@ void LogManager::upload_logs() {
     }
 }
 
-void LogManager::start_timer() { ESP_ERROR_CHECK(esp_timer_start_once(_log_timer, ESP_TIMER_MS(CONFIG_LOG_INTERVAL))); }
+void LogManager::start_timer() {
+    ESP_ERROR_CHECK(esp_timer_start_once(_log_timer, ESP_TIMER_MS(CONFIG_MDM_LOG_INTERVAL)));
+}

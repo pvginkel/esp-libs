@@ -164,7 +164,18 @@ esp_err_t ApplicationBase::load_device_configuration() {
 
     const auto data = cJSON_Parse(json.c_str());
     ESP_RETURN_ON_FALSE(data, ESP_ERR_INVALID_ARG, TAG, "Failed to parse JSON");
+    DEFER(cJSON_Delete(data));
 
+    ESP_ERROR_RETURN(parse_device_configuration(data));
+
+    ESP_LOGI(TAG, "Signalling configuration loaded");
+
+    do_configuration_loaded(data);
+
+    return ESP_OK;
+}
+
+esp_err_t ApplicationBase::parse_device_configuration(cJSON* data) {
     auto device_name_item = cJSON_GetObjectItemCaseSensitive(data, "deviceName");
     ESP_RETURN_ON_FALSE(cJSON_IsString(device_name_item) && device_name_item->valuestring, ESP_ERR_INVALID_ARG, TAG,
                         "Cannot get deviceName property");
@@ -197,6 +208,8 @@ esp_err_t ApplicationBase::load_device_configuration() {
 }
 
 void ApplicationBase::begin_after_initialization() {
+    setup_mqtt_subscriptions();
+
     // Log the reset reason.
 
     auto reset_reason = esp_reset_reason();
@@ -207,4 +220,36 @@ void ApplicationBase::begin_after_initialization() {
     do_ready();
 }
 
-void ApplicationBase::process() { _queue.process(); }
+void ApplicationBase::setup_mqtt_subscriptions() {
+    _mqtt_connection.subscribe("iotsupport/updates/config",
+                               [this](const std::string& data) { handle_iotsupport_update(data, "config"); });
+
+    _mqtt_connection.subscribe("iotsupport/updates/firmware",
+                               [this](const std::string& data) { handle_iotsupport_update(data, "firmware"); });
+}
+
+void ApplicationBase::handle_iotsupport_update(const std::string& data, const char* update_type) {
+    auto json = cJSON_Parse(data.c_str());
+    if (!json) {
+        ESP_LOGE(TAG, "Failed to parse %s update JSON", update_type);
+        return;
+    }
+    DEFER(cJSON_Delete(json));
+
+    auto client_id_item = cJSON_GetObjectItemCaseSensitive(json, "client_id");
+    if (!cJSON_IsString(client_id_item) || !client_id_item->valuestring) {
+        ESP_LOGE(TAG, "Cannot get client_id from %s update", update_type);
+        return;
+    }
+
+    if (_mdm_configuration.get_client_id() == client_id_item->valuestring) {
+        ESP_LOGI(TAG, "Received %s update for this device; restarting", update_type);
+        esp_restart();
+    }
+}
+
+void ApplicationBase::process() {
+    _queue.process();
+
+    do_process();
+}

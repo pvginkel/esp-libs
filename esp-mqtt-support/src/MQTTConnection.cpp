@@ -183,6 +183,14 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
         return;
     }
 
+    // Check for custom topic subscriptions.
+    auto topic_it = _topic_callbacks.find(topic);
+    if (topic_it != _topic_callbacks.end()) {
+        auto data = std::string(event->data, event->data_len);
+        topic_it->second(data);
+        return;
+    }
+
     if (!topic.starts_with(_topic_prefix)) {
         ESP_LOGE(TAG, "Unexpected topic %s topic len %d data len %d", topic.c_str(), event->topic_len, event->data_len);
         return;
@@ -209,6 +217,11 @@ void MQTTConnection::subscribe(const std::string& topic) {
     ESP_LOGI(TAG, "Subscribing to topic %s", topic.c_str());
 
     ESP_ASSERT_CHECK(esp_mqtt_client_subscribe(_client, topic.c_str(), 0) >= 0);
+}
+
+void MQTTConnection::subscribe(const std::string& topic, std::function<void(const std::string&)> callback) {
+    _topic_callbacks[topic] = std::move(callback);
+    subscribe(topic);
 }
 
 void MQTTConnection::unsubscribe(const std::string& topic) {
