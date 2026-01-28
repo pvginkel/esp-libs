@@ -6,7 +6,7 @@
 
 #include "esp_timer.h"
 
-Queue::Queue() { _queue = xQueueCreate(32, sizeof(std::function<void()>)); }
+Queue::Queue() { _queue = xQueueCreate(32, sizeof(void*)); }
 
 void Queue::enqueue(const std::function<void()>& task) {
     auto* copy = new std::function<void()>(task);

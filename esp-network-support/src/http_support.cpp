@@ -36,7 +36,7 @@ esp_err_t esp_http_get_json(esp_http_client_handle_t client, cJSON*& data, size_
     ESP_ERROR_RETURN(esp_http_get_response(client, json, max_length));
 
     data = cJSON_Parse(json.c_str());
-    ESP_RETURN_ON_FALSE(data, ESP_ERR_INVALID_ARG, TAG, "Failed to parse JSON");
+    ESP_RETURN_ON_FALSE(data, ESP_ERR_INVALID_ARG, TAG, "Failed to parse JSON; received: %s", json.c_str());
 
     return ESP_OK;
 }

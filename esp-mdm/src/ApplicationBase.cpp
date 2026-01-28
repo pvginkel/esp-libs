@@ -17,9 +17,11 @@ LOG_TAG(ApplicationBase);
 ApplicationBase::ApplicationBase() : _network_connection(&_queue), _mqtt_connection(&_queue) {}
 
 void ApplicationBase::begin(bool silent) {
-    ESP_LOGI(TAG, "Setting up the log manager");
+    ESP_LOGI(TAG, "Loading provisioning data");
 
     ESP_ERROR_CHECK(_mdm_configuration.load());
+
+    ESP_LOGI(TAG, "Setting up the log manager");
 
     ESP_ERROR_CHECK(_log_manager.begin(_mdm_configuration.get_logging_url()));
 
@@ -58,15 +60,15 @@ void ApplicationBase::begin_network() {
 }
 
 void ApplicationBase::begin_network_available() {
-    ESP_LOGI(TAG, "Checking for firmware update");
-
-    ESP_ERROR_CHECK(install_firmware_update());
-
     ESP_LOGI(TAG, "Getting device configuration");
 
     ESP_ERROR_CHECK(load_device_configuration());
 
     _log_manager.set_device_entity_id(_device_entity_id.c_str());
+
+    ESP_LOGI(TAG, "Checking for firmware update");
+
+    ESP_ERROR_CHECK(install_firmware_update());
 
     ESP_LOGI(TAG, "Configuration loaded; signalling network available");
 
@@ -104,7 +106,7 @@ esp_err_t ApplicationBase::ensure_access_token() {
     ESP_LOGI(TAG, "Requesting access token from %s", _mdm_configuration.get_token_url().c_str());
 
     // Build the POST body.
-    auto body = strformat("grant_type=client_credentials&client_id=%s&client_secret=%s",
+    auto body = strformat("grant_type=client_credentials&scope=openid+profile+email&client_id=%s&client_secret=%s",
                           _mdm_configuration.get_client_id().c_str(), _mdm_configuration.get_client_secret().c_str());
 
     // Make the token request.
@@ -119,8 +121,9 @@ esp_err_t ApplicationBase::ensure_access_token() {
 
     ESP_ERROR_RETURN(esp_http_client_set_method(client, HTTP_METHOD_POST));
     ESP_ERROR_RETURN(esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded"));
-    ESP_ERROR_RETURN(esp_http_client_set_post_field(client, body.c_str(), body.length()));
     ESP_ERROR_RETURN(esp_http_client_open(client, body.length()));
+
+    ESP_ASSERT_RETURN(esp_http_client_write(client, body.c_str(), body.length()) >= 0, ESP_FAIL);
 
     auto length = esp_http_client_fetch_headers(client);
     if (length < 0) {
@@ -180,6 +183,7 @@ esp_err_t ApplicationBase::load_device_configuration() {
     esp_http_client_config_t config = {
         .url = url.c_str(),
         .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
+        .buffer_size_tx = 4096,
     };
 
     ESP_LOGI(TAG, "Getting device configuration from %s", config.url);
@@ -260,8 +264,10 @@ void ApplicationBase::setup_mqtt_subscriptions() {
     _mqtt_connection.subscribe("iotsupport/updates/config",
                                [this](const std::string& data) { handle_iotsupport_update(data, "config"); });
 
-    _mqtt_connection.subscribe("iotsupport/updates/firmware",
-                               [this](const std::string& data) { handle_iotsupport_update(data, "firmware"); });
+    if (_enable_ota) {
+        _mqtt_connection.subscribe("iotsupport/updates/firmware",
+                                   [this](const std::string& data) { handle_iotsupport_update(data, "firmware"); });
+    }
 
     _mqtt_connection.subscribe("iotsupport/updates/provisioning", [this](const std::string& data) {
         if (!is_iotsupport_message_for_us(data, "provisioning")) {
@@ -310,6 +316,7 @@ esp_err_t ApplicationBase::handle_iotsupport_provisioning() {
     esp_http_client_config_t config = {
         .url = url.c_str(),
         .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
+        .buffer_size_tx = 4096,
     };
 
     ESP_LOGI(TAG, "Getting provisioning data from %s", config.url);

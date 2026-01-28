@@ -100,6 +100,6 @@ private:
     void publish_discovery(const char* component, const MQTTDiscovery& metadata,
                            std::function<void(cJSON* json, const char* object_id)> func);
     void register_callback(const char* object_id, std::function<void(const std::string&)> callback);
-    bool handle_discovery_prune(const std::string& topic);
+    bool handle_discovery_prune(const std::string& topic, bool empty_message);
     std::string get_firmware_version();
 };

@@ -165,7 +165,7 @@ void MQTTConnection::handle_connected() {
     subscribe(discovery_topic);
     _queue->enqueue_delayed([this, discovery_topic]() { unsubscribe(discovery_topic); }, 60000);
 
-    _connected_changed.queue(_queue, {true});
+    _connected_changed.call({true});
 }
 
 void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
@@ -179,7 +179,7 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
 
     auto topic = std::string(event->topic, event->topic_len);
 
-    if (handle_discovery_prune(topic)) {
+    if (handle_discovery_prune(topic, !event->data_len)) {
         return;
     }
 
@@ -221,6 +221,7 @@ void MQTTConnection::subscribe(const std::string& topic) {
 
 void MQTTConnection::subscribe(const std::string& topic, std::function<void(const std::string&)> callback) {
     _topic_callbacks[topic] = std::move(callback);
+
     subscribe(topic);
 }
 
@@ -393,7 +394,7 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
 
     func(root, object_id.c_str());
 
-    auto topic = strformat("homeassistant/%s/%s/%s/config", component, _device_id.c_str(), object_id);
+    auto topic = strformat("homeassistant/%s/%s/%s/config", component, _device_id.c_str(), object_id.c_str());
     _published_discovery_topics.insert(topic);
     publish_json(root, topic, true);
 
@@ -404,13 +405,15 @@ void MQTTConnection::register_callback(const char* object_id, std::function<void
     _command_callbacks[object_id] = std::move(callback);
 }
 
-bool MQTTConnection::handle_discovery_prune(const std::string& topic) {
-    if (_published_discovery_topics.find(topic) != _published_discovery_topics.end()) {
+bool MQTTConnection::handle_discovery_prune(const std::string& topic, bool empty_message) {
+    if (!topic.starts_with("homeassistant/")) {
         return false;
     }
 
-    ESP_LOGI(TAG, "Pruning stale discovery topic %s", topic.c_str());
-    ESP_ASSERT_CHECK(esp_mqtt_client_publish(_client, topic.c_str(), "", 0, QOS_MIN_ONE, true) >= 0);
+    if (!empty_message && _published_discovery_topics.find(topic) == _published_discovery_topics.end()) {
+        ESP_LOGI(TAG, "Pruning stale discovery topic %s", topic.c_str());
+        ESP_ASSERT_CHECK(esp_mqtt_client_publish(_client, topic.c_str(), "", 0, QOS_MIN_ONE, true) >= 0);
+    }
 
     return true;
 }

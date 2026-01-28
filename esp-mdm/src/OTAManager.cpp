@@ -55,6 +55,7 @@ esp_err_t OTAManager::install_firmware(OTAConfig& ota_config, bool& firmware_ins
     esp_http_client_config_t config = {
         .url = ota_config.endpoint,
         .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
+        .buffer_size_tx = 4096,
     };
 
     ESP_LOGI(TAG, "Getting firmware from '%s'", config.url);
