@@ -4,6 +4,7 @@
 
 #include "cJSON.h"
 #include "esp_http_client.h"
+#include "esp_wifi.h"
 
 constexpr auto BUFFER_SIZE = 1024;
 constexpr auto BLOCK_SIZE = 10;
@@ -64,6 +65,7 @@ esp_err_t LogManager::begin(const std::string& logging_url) {
         if (_instance) {
             ESP_LOGI(TAG, "Uploading log messages before restart");
 
+            _instance->_shutting_down = true;
             _instance->upload_logs();
         }
     });
@@ -147,5 +149,7 @@ esp_err_t LogManager::upload_logs() {
 }
 
 void LogManager::start_timer() {
-    ESP_ERROR_CHECK(esp_timer_start_once(_log_timer, ESP_TIMER_MS(CONFIG_MDM_LOG_INTERVAL)));
+    if (!_instance->_shutting_down) {
+        ESP_ERROR_CHECK(esp_timer_start_once(_log_timer, ESP_TIMER_MS(CONFIG_MDM_LOG_INTERVAL)));
+    }
 }

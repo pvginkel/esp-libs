@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,7 @@ class LogManager {
     std::vector<Message> _messages;
     const char* _device_entity_id{};
     esp_timer_handle_t _log_timer;
+    std::atomic<bool> _shutting_down;
 
     static int log_handler(const char* message, va_list va);
 

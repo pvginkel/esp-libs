@@ -17,19 +17,19 @@ LOG_TAG(ApplicationBase);
 ApplicationBase::ApplicationBase() : _network_connection(&_queue), _mqtt_connection(&_queue) {}
 
 void ApplicationBase::begin(bool silent) {
+    ESP_ERROR_CHECK(setup_flash());
+
     ESP_LOGI(TAG, "Loading provisioning data");
 
     ESP_ERROR_CHECK(_mdm_configuration.load());
 
+    do_begin();
+
+    begin_network();
+
     ESP_LOGI(TAG, "Setting up the log manager");
 
     ESP_ERROR_CHECK(_log_manager.begin(_mdm_configuration.get_logging_url()));
-
-    do_begin();
-
-    ESP_ERROR_CHECK(setup_flash());
-
-    begin_network();
 }
 
 esp_err_t ApplicationBase::setup_flash() {

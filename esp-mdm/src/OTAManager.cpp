@@ -11,7 +11,7 @@
 #define BUFFER_SIZE 1024
 
 #if CONFIG_ESP_MAIN_TASK_STACK_SIZE < 6144
-#error OTA requires a stack size of at least
+#error OTA requires a stack size of at least 6144
 #endif
 
 LOG_TAG(OTAManager);
@@ -160,7 +160,7 @@ esp_err_t OTAManager::install_firmware(OTAConfig& ota_config, bool& firmware_ins
 
         firmware_size += read;
 
-        ESP_LOGI(TAG, "Written %d bytes, total %d", read, firmware_size);
+        ESP_LOGD(TAG, "Written %d bytes, total %d", read, firmware_size);
     }
 
     ESP_RETURN_ON_FALSE(esp_http_client_is_complete_data_received(client), ESP_FAIL, TAG, "Stream not fully read");
