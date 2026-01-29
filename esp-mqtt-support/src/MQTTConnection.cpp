@@ -161,7 +161,7 @@ void MQTTConnection::handle_connected() {
     _published_discovery_topics.clear();
     _publish_discovery.call();
 
-    auto discovery_topic = strformat("homeassistant/+/%s/+/config", _device_id.c_str());
+    auto discovery_topic = strformat("homeassistant/+/%s/+/config", _device_id);
     subscribe(discovery_topic);
     _queue->enqueue_delayed([this, discovery_topic]() { unsubscribe(discovery_topic); }, 60000);
 
@@ -234,7 +234,7 @@ void MQTTConnection::unsubscribe(const std::string& topic) {
 void MQTTConnection::publish_configuration() {
     ESP_LOGI(TAG, "Publishing configuration information");
 
-    auto uniqueIdentifier = strformat("%s_%s", CONFIG_MQTT_TOPIC_PREFIX, _device_id.c_str());
+    auto uniqueIdentifier = strformat("%s_%s", CONFIG_MQTT_TOPIC_PREFIX, _device_id);
 
     cJSON_Data root = {cJSON_CreateObject()};
 
@@ -352,7 +352,7 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
     cJSON_AddItemToArray(availability, availability_item);
 
     cJSON_AddStringToObject(availability_item, "topic",
-                            strformat(CONFIG_MQTT_TOPIC_PREFIX "/%s/state", _device_id.c_str()).c_str());
+                            strformat(CONFIG_MQTT_TOPIC_PREFIX "/%s/state", _device_id).c_str());
     cJSON_AddStringToObject(availability_item, "value_template", "{{ value_json.online }}");
     cJSON_AddBoolToObject(availability_item, "payload_available", true);
 
@@ -360,7 +360,7 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
 
     const auto device = cJSON_AddObjectToObject(root, "device");
 
-    auto device_identifier = strformat("%s_%s", CONFIG_MQTT_TOPIC_PREFIX, _device_id.c_str());
+    auto device_identifier = strformat("%s_%s", CONFIG_MQTT_TOPIC_PREFIX, _device_id);
     if (metadata.subdevice_id) {
         cJSON_AddStringToObject(device, "via_device", device_identifier.c_str());
 
@@ -384,9 +384,9 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
                                                  : std::string(metadata.object_id);
 
     cJSON_AddStringToObject(root, "unique_id",
-                            strformat("%s_%s_%s", _device_id.c_str(), component, object_id.c_str()).c_str());
+                            strformat("%s_%s_%s", _device_id, component, object_id).c_str());
     cJSON_AddStringToObject(root, "object_id",
-                            strformat("%s_%s", _configuration.device_entity_id.c_str(), object_id.c_str()).c_str());
+                            strformat("%s_%s", _configuration.device_entity_id, object_id).c_str());
 
     if (!metadata.enabled_by_default) {
         cJSON_AddBoolToObject(root, "enabled_by_default", false);
@@ -394,7 +394,7 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
 
     func(root, object_id.c_str());
 
-    auto topic = strformat("homeassistant/%s/%s/%s/config", component, _device_id.c_str(), object_id.c_str());
+    auto topic = strformat("homeassistant/%s/%s/%s/config", component, _device_id, object_id);
     _published_discovery_topics.insert(topic);
     publish_json(root, topic, true);
 

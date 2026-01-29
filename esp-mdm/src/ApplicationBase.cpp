@@ -107,7 +107,7 @@ esp_err_t ApplicationBase::ensure_access_token() {
 
     // Build the POST body.
     auto body = strformat("grant_type=client_credentials&scope=openid+profile+email&client_id=%s&client_secret=%s",
-                          _mdm_configuration.get_client_id().c_str(), _mdm_configuration.get_client_secret().c_str());
+                          _mdm_configuration.get_client_id(), _mdm_configuration.get_client_secret());
 
     // Make the token request.
     esp_http_client_config_t config = {
