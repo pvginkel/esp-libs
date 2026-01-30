@@ -427,6 +427,12 @@ std::string MQTTConnection::get_firmware_version() {
     return running_app_info.version;
 }
 
+void MQTTConnection::send_state() {
+    auto data = cJSON_CreateObject();
+    send_state(data);
+    cJSON_Delete(data);
+}
+
 void MQTTConnection::send_state(cJSON* data) {
     ESP_LOGI(TAG, "Publishing new state");
 
@@ -441,4 +447,6 @@ void MQTTConnection::send_state(cJSON* data) {
     if (result < 0) {
         ESP_LOGE(TAG, "Sending status update message failed with error %d", result);
     }
+
+    cJSON_free(json);
 }

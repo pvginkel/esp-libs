@@ -77,6 +77,7 @@ public:
     void set_configuration(MQTTConfiguration configuration) { _configuration = configuration; }
     void begin();
     bool is_connected() { return !!_client; }
+    void send_state();
     void send_state(cJSON* data);
     void on_connected_changed(std::function<void(MQTTConnectionState)> func) { _connected_changed.add(func); }
     void on_publish_discovery(std::function<void()> func) { _publish_discovery.add(func); }
