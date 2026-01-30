@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 
 #include "Queue.h"
@@ -10,26 +11,41 @@ class Callback {
         std::function<void(Arg)> func;
         Node* next;
 
-        Node(const std::function<void(Arg)>& func, Node* next) : func(func), next(next) {}
+        Node(std::function<void(Arg)> func, Node* next) : func(std::move(func)), next(next) {}
     };
 
-    Node* _node;
+    std::atomic<Node*> _head{nullptr};
 
 public:
-    Callback() : _node(nullptr) {}
-
+    // Not thread-safe vs concurrent add/call.
     ~Callback() {
-        while (_node) {
-            auto node = _node;
-            _node = node->next;
-            delete node;
+        auto n = _head.load(std::memory_order_relaxed);
+        while (n) {
+            auto next = n->next;
+            delete n;
+            n = next;
         }
     }
 
-    void add(const std::function<void(Arg)>& func) { _node = new Node(func, _node); }
+    void add(std::function<void(Arg)> func) {
+        auto node = new Node(std::move(func), nullptr);
 
-    bool call(Arg arg) {
-        auto node = _node;
+        // Treiber push: publish n as new head.
+        Node* old = _head.load(std::memory_order_relaxed);
+        do {
+            node->next = old;  // only this thread writes n->next, before publish
+        } while (!_head.compare_exchange_weak(old, node,
+                                              std::memory_order_release,  // publish node contents (func + next)
+                                              std::memory_order_relaxed   // on failure, just retry
+                                              ));
+    }
+
+    bool call(Arg arg) const {
+        // Snapshot head. Acquire pairs with add()'s release so the constructed
+        // node (func/next) is visible to this thread.
+
+        auto node = _head.load(std::memory_order_acquire);
+
         if (!node) {
             return false;
         }
@@ -53,26 +69,41 @@ class Callback<void> {
         std::function<void()> func;
         Node* next;
 
-        Node(const std::function<void()>& func, Node* next) : func(func), next(next) {}
+        Node(std::function<void()> func, Node* next) : func(std::move(func)), next(next) {}
     };
 
-    Node* _node;
+    std::atomic<Node*> _head{nullptr};
 
 public:
-    Callback() : _node(nullptr) {}
-
+    // Not thread-safe vs concurrent add/call.
     ~Callback() {
-        while (_node) {
-            auto node = _node;
-            _node = node->next;
-            delete node;
+        auto n = _head.load(std::memory_order_relaxed);
+        while (n) {
+            auto next = n->next;
+            delete n;
+            n = next;
         }
     }
 
-    void add(const std::function<void()>& func) { _node = new Node(func, _node); }
+    void add(std::function<void()> func) {
+        auto node = new Node(std::move(func), nullptr);
 
-    bool call() {
-        auto node = _node;
+        // Treiber push: publish n as new head.
+        Node* old = _head.load(std::memory_order_relaxed);
+        do {
+            node->next = old;  // only this thread writes n->next, before publish
+        } while (!_head.compare_exchange_weak(old, node,
+                                              std::memory_order_release,  // publish node contents (func + next)
+                                              std::memory_order_relaxed   // on failure, just retry
+                                              ));
+    }
+
+    bool call() const {
+        // Snapshot head. Acquire pairs with add()'s release so the constructed
+        // node (func/next) is visible to this thread.
+
+        auto node = _head.load(std::memory_order_acquire);
+
         if (!node) {
             return false;
         }

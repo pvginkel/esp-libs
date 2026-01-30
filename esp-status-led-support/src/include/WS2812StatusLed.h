@@ -1,12 +1,14 @@
 #pragma once
 
+#include <atomic>
+
 #include "RGBStatusLed.h"
 #include "led_strip.h"
 
 class WS2812StatusLed : public RGBStatusLed, public BrightnessStatusLed {
     led_strip_handle_t _led{};
-    int64_t _next_update_ms{};  // 0 = disabled, 1 = immediate, else = scheduled time
-    int64_t _phase_start_ms{};
+    std::atomic<int64_t> _next_update_ms{};  // 0 = disabled, 1 = immediate, else = scheduled time
+    std::atomic<int64_t> _phase_start_ms{};
     bool _blink_state{};
 
 public:

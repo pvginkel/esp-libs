@@ -187,7 +187,7 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
     // Check for custom topic subscriptions.
     auto topic_it = _topic_callbacks.find(topic);
     if (topic_it != _topic_callbacks.end()) {
-        auto data = std::string(event->data, event->data_len);
+        auto data = event->data_len ? std::string(event->data, event->data_len) : std::string();
         topic_it->second(data);
         return;
     }
@@ -207,7 +207,7 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
     auto object_id = sub_topic.substr(4);
     auto it = _command_callbacks.find(object_id);
     if (it != _command_callbacks.end()) {
-        auto data = std::string(event->data, event->data_len);
+        auto data = event->data_len ? std::string(event->data, event->data_len) : std::string();
         it->second(data);
     } else {
         ESP_LOGW(TAG, "No callback registered for object_id '%s'", object_id.c_str());
@@ -238,6 +238,7 @@ void MQTTConnection::publish_configuration() {
     auto uniqueIdentifier = strformat("%s_%s", CONFIG_MQTT_TOPIC_PREFIX, _device_id);
 
     auto root = cJSON_CreateObject();
+    ESP_ASSERT_CHECK(root);
     DEFER(cJSON_Delete(root));
 
     cJSON_AddStringToObject(root, "unique_id", uniqueIdentifier.c_str());
@@ -275,7 +276,7 @@ void MQTTConnection::publish_button_discovery(MQTTDiscovery metadata, std::funct
 }
 
 void MQTTConnection::publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensorDiscovery component_metadata) {
-    publish_discovery("sensor", metadata, [this, &component_metadata](auto json, auto object_id) {
+    publish_discovery("sensor", metadata, [this, component_metadata](auto json, auto object_id) {
         cJSON_AddStringToObject(json, "state_class", component_metadata.state_class);
         cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
         cJSON_AddStringToObject(json, "unit_of_measurement", component_metadata.unit_of_measurement);
@@ -285,7 +286,7 @@ void MQTTConnection::publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensor
 
 void MQTTConnection::publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata,
                                               std::function<void(bool)> command_func) {
-    publish_discovery("switch", metadata, [this, &component_metadata, command_func](auto json, auto object_id) {
+    publish_discovery("switch", metadata, [this, component_metadata, command_func](auto json, auto object_id) {
         cJSON_AddStringToObject(json, "command_topic", (_topic_prefix + "set/" + object_id).c_str());
         cJSON_AddStringToObject(json, "payload_on", "on");
         cJSON_AddStringToObject(json, "payload_off", "off");
@@ -306,7 +307,7 @@ void MQTTConnection::publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitch
 
 void MQTTConnection::publish_binary_sensor_discovery(MQTTDiscovery metadata,
                                                      MQTTBinarySensorDiscovery component_metadata) {
-    publish_discovery("binary_sensor", metadata, [this, &component_metadata](auto json, auto object_id) {
+    publish_discovery("binary_sensor", metadata, [this, component_metadata](auto json, auto object_id) {
         cJSON_AddBoolToObject(json, "payload_on", true);
         cJSON_AddBoolToObject(json, "payload_off", false);
         cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
@@ -316,7 +317,7 @@ void MQTTConnection::publish_binary_sensor_discovery(MQTTDiscovery metadata,
 
 void MQTTConnection::publish_number_discovery(MQTTDiscovery metadata, MQTTNumberDiscovery component_metadata,
                                               std::function<void(const std::string&)> command_func) {
-    publish_discovery("binary_sensor", metadata, [this, &component_metadata, command_func](auto json, auto object_id) {
+    publish_discovery("number", metadata, [this, component_metadata, command_func](auto json, auto object_id) {
         if (component_metadata.unit_of_measurement) {
             cJSON_AddStringToObject(json, "unit_of_measurement", component_metadata.unit_of_measurement);
         }
@@ -338,6 +339,8 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
     // MDI icons can be found here: https://pictogrammers.com/library/mdi/.
 
     const auto root = cJSON_CreateObject();
+    ESP_ASSERT_CHECK(root);
+    DEFER(cJSON_Delete(root));
 
     cJSON_AddStringToObject(root, "name", metadata.name);
     cJSON_AddStringToObject(root, "icon", metadata.icon);
@@ -385,10 +388,8 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
     const auto object_id = metadata.subdevice_id ? strformat("%s_%s", metadata.subdevice_id, metadata.object_id)
                                                  : std::string(metadata.object_id);
 
-    cJSON_AddStringToObject(root, "unique_id",
-                            strformat("%s_%s_%s", _device_id, component, object_id).c_str());
-    cJSON_AddStringToObject(root, "object_id",
-                            strformat("%s_%s", _configuration.device_entity_id, object_id).c_str());
+    cJSON_AddStringToObject(root, "unique_id", strformat("%s_%s_%s", _device_id, component, object_id).c_str());
+    cJSON_AddStringToObject(root, "object_id", strformat("%s_%s", _configuration.device_entity_id, object_id).c_str());
 
     if (!metadata.enabled_by_default) {
         cJSON_AddBoolToObject(root, "enabled_by_default", false);
@@ -399,8 +400,6 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
     auto topic = strformat("homeassistant/%s/%s/%s/config", component, _device_id, object_id);
     _published_discovery_topics.insert(topic);
     publish_json(root, topic, true);
-
-    cJSON_free(root);
 }
 
 void MQTTConnection::register_callback(const char* object_id, std::function<void(const std::string&)> callback) {

@@ -13,9 +13,14 @@ constexpr auto MAX_MESSAGES = 100;
 LOG_TAG(LogManager);
 
 LogManager* LogManager::_instance = nullptr;
+// Intentional one-time allocation; freeing on shutdown provides no benefit.
 char* LogManager::_buffer = new char[BUFFER_SIZE];
 
 int LogManager::log_handler(const char* message, va_list va) {
+    if (!_instance) {
+        return 0;
+    }
+
     va_list vaCopy;
     va_copy(vaCopy, va);
 
@@ -34,9 +39,11 @@ int LogManager::log_handler(const char* message, va_list va) {
         bool startTimer = false;
 
         if (result >= 0 && result < BUFFER_SIZE) {
-            startTimer = _instance->_device_entity_id && _instance->_messages.size() == 0;
+            auto buffer_copy = strdup(_buffer);
+            ESP_ASSERT_CHECK(buffer_copy);
 
-            _instance->_messages.push_back(Message(strdup(_buffer), esp_get_millis()));
+            startTimer = !_instance->_device_entity_id.empty() && _instance->_messages.size() == 0;
+            _instance->_messages.push_back(Message(buffer_copy, esp_get_millis()));
         }
 
         if (startTimer) {
@@ -59,6 +66,7 @@ esp_err_t LogManager::begin(const std::string& logging_url) {
         .name = "logManagerTimer",
     };
 
+    // Timer is application-lifetime; no cleanup needed.
     ESP_ERROR_RETURN(esp_timer_create(&displayOffTimerArgs, &_log_timer));
 
     esp_register_shutdown_handler([]() {
@@ -73,7 +81,7 @@ esp_err_t LogManager::begin(const std::string& logging_url) {
     return ESP_OK;
 }
 
-void LogManager::set_device_entity_id(const char* device_entity_id) {
+void LogManager::set_device_entity_id(const std::string& device_entity_id) {
     auto startTimer = _mutex.with<bool>([this, &device_entity_id]() {
         _device_entity_id = device_entity_id;
 
@@ -87,7 +95,7 @@ void LogManager::set_device_entity_id(const char* device_entity_id) {
 
 esp_err_t LogManager::upload_logs() {
     auto messages = _mutex.with<std::vector<Message>>([this]() {
-        if (!_device_entity_id) {
+        if (_device_entity_id.empty()) {
             return std::vector<Message>();
         }
 
@@ -118,7 +126,7 @@ esp_err_t LogManager::upload_logs() {
 
             cJSON_AddStringToObject(root, "message", message.buffer);
             cJSON_AddNumberToObject(root, "relative_time", double(millis - message.time));
-            cJSON_AddStringToObject(root, "entity_id", _device_entity_id);
+            cJSON_AddStringToObject(root, "entity_id", _device_entity_id.c_str());
 
             auto json = cJSON_PrintUnformatted(root);
             cJSON_Delete(root);

@@ -1,15 +1,22 @@
-#include "include/Mutex.h"
+#include "Mutex.h"
+
+#include "error.h"
 
 MutexLock::MutexLock(Mutex* mutex) : _mutex(mutex) {}
 
 MutexLock::~MutexLock() { _mutex->give(); }
 
-Mutex::Mutex() : _lock(xSemaphoreCreateMutex()) {}
+Mutex::Mutex() {
+    _lock = xSemaphoreCreateMutex();
+
+    ESP_ASSERT_CHECK(_lock);
+}
 
 Mutex::~Mutex() { vSemaphoreDelete(_lock); }
 
 MutexLock Mutex::take(TickType_t xTicksToWait) {
-    xSemaphoreTake(_lock, xTicksToWait);
+    ESP_ASSERT_CHECK(xSemaphoreTake(_lock, xTicksToWait));
+
     return {this};
 }
 

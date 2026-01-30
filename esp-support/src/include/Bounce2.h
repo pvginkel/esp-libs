@@ -73,7 +73,7 @@ public:
 
 @endcode
 */
-    Debouncer();
+    Debouncer() {}
 
     /**
 @brief  Sets the debounce interval in milliseconds.
@@ -155,11 +155,11 @@ public:
 protected:
     void begin();
     virtual bool readCurrentState() = 0;
-    unsigned long previous_millis;
-    uint16_t interval_millis;
-    uint8_t state;
-    unsigned long stateChangeLastTime;
-    unsigned long durationOfPreviousState;
+    unsigned long previous_millis{};
+    uint16_t interval_millis{10};
+    uint8_t state{};
+    unsigned long stateChangeLastTime{};
+    unsigned long durationOfPreviousState{};
 };
 
 /**

@@ -28,7 +28,7 @@ class LogManager {
     vprintf_like_t _default_log_handler{};
     Mutex _mutex;
     std::vector<Message> _messages;
-    const char* _device_entity_id{};
+    std::string _device_entity_id;
     esp_timer_handle_t _log_timer;
     std::atomic<bool> _shutting_down;
 
@@ -38,7 +38,7 @@ public:
     LogManager();
 
     esp_err_t begin(const std::string& logging_url);
-    void set_device_entity_id(const char* device_entity_id);
+    void set_device_entity_id(const std::string& device_entity_id);
 
 private:
     esp_err_t upload_logs();

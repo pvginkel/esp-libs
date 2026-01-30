@@ -1,5 +1,7 @@
 #include "NVSProperty.h"
 
+#include <string.h>
+
 esp_err_t nvs_get_i1(nvs_handle_t c_handle, const char* key, bool* out_value) {
     int8_t real_value;
     const auto err = nvs_get_i8(c_handle, key, &real_value);
@@ -14,11 +16,18 @@ esp_err_t nvs_set_i1(nvs_handle_t handle, const char* key, bool value) {
 }
 
 esp_err_t nvs_get_f32(nvs_handle_t c_handle, const char* key, float* out_value) {
-    return nvs_get_u32(c_handle, key, (uint32_t*)out_value);
+    uint32_t raw_value;
+    const auto err = nvs_get_u32(c_handle, key, &raw_value);
+    if (err == ESP_OK) {
+        memcpy(out_value, &raw_value, sizeof(float));
+    }
+    return err;
 }
 
 esp_err_t nvs_set_f32(nvs_handle_t handle, const char* key, float value) {
-    return nvs_set_u32(handle, key, *(uint32_t*)&value);
+    uint32_t raw_value;
+    memcpy(&raw_value, &value, sizeof(float));
+    return nvs_set_u32(handle, key, raw_value);
 }
 
 #define NVSProperty_DEFINE(type, typename_uc, typename_lc)                        \

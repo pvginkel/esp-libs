@@ -64,7 +64,7 @@ void ApplicationBase::begin_network_available() {
 
     ESP_ERROR_CHECK(load_device_configuration());
 
-    _log_manager.set_device_entity_id(_device_entity_id.c_str());
+    _log_manager.set_device_entity_id(_device_entity_id);
 
     ESP_LOGI(TAG, "Checking for firmware update");
 

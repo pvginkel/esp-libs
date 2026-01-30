@@ -17,6 +17,7 @@ NetworkConnection::NetworkConnection(Queue* synchronizationQueue) : _synchroniza
 }
 
 esp_err_t NetworkConnection::begin(const char* ssid, const char* password) {
+    // Event group is application-lifetime; no cleanup needed.
     _wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_RETURN(esp_netif_init());
@@ -28,22 +29,19 @@ esp_err_t NetworkConnection::begin(const char* ssid, const char* password) {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_RETURN(esp_wifi_init(&cfg));
 
-    esp_event_handler_instance_t instanceAnyId;
-    esp_event_handler_instance_t instanceGotIp;
-
     ESP_ERROR_RETURN(esp_event_handler_instance_register(
         WIFI_EVENT, ESP_EVENT_ANY_ID,
         [](auto eventHandlerArg, auto eventBase, auto eventId, auto eventData) {
             ((NetworkConnection*)eventHandlerArg)->event_handler(eventBase, eventId, eventData);
         },
-        this, &instanceAnyId));
+        this, nullptr));
 
     ESP_ERROR_RETURN(esp_event_handler_instance_register(
         IP_EVENT, IP_EVENT_STA_GOT_IP,
         [](auto eventHandlerArg, auto eventBase, auto eventId, auto eventData) {
             ((NetworkConnection*)eventHandlerArg)->event_handler(eventBase, eventId, eventData);
         },
-        this, &instanceGotIp));
+        this, nullptr));
 
     wifi_config_t wifiConfig = {
         .sta =
@@ -64,6 +62,8 @@ esp_err_t NetworkConnection::begin(const char* ssid, const char* password) {
             },
     };
 
+    ESP_ASSERT_RETURN(strlen(ssid) < sizeof(wifiConfig.sta.ssid), ESP_ERR_INVALID_ARG);
+    ESP_ASSERT_RETURN(strlen(password) < sizeof(wifiConfig.sta.password), ESP_ERR_INVALID_ARG);
     strcpy((char*)wifiConfig.sta.ssid, ssid);
     strcpy((char*)wifiConfig.sta.password, password);
 
@@ -151,7 +151,7 @@ void NetworkConnection::setup_sntp() {
 
 #else
 
-    _instance->_state_changed.queue(_instance->_synchronization_queue, {.connected = true, .errorReason = 0});
+    _state_changed.queue(_synchronization_queue, {.connected = true, .errorReason = 0});
 
 #endif
 }

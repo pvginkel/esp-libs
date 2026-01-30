@@ -10,8 +10,6 @@ static uint32_t millis() { return uint32_t(esp_timer_get_time() / 1000ll); }
 // DEBOUNCE //
 //////////////
 
-Debouncer::Debouncer() : previous_millis(0), interval_millis(10), state(0) {}
-
 void Debouncer::interval(uint16_t interval_millis) { this->interval_millis = interval_millis; }
 
 void Debouncer::begin() {
