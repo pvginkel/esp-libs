@@ -7,7 +7,7 @@
 #include "Callback.h"
 #include "Queue.h"
 #include "Span.h"
-#include "cJSONSupport.h"
+#include "cJSON.h"
 #include "mqtt_client.h"
 
 struct MQTTConnectionState {

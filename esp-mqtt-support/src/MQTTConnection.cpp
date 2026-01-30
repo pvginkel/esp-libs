@@ -4,6 +4,7 @@
 
 #include <charconv>
 
+#include "defer.h"
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
 
@@ -236,17 +237,18 @@ void MQTTConnection::publish_configuration() {
 
     auto uniqueIdentifier = strformat("%s_%s", CONFIG_MQTT_TOPIC_PREFIX, _device_id);
 
-    cJSON_Data root = {cJSON_CreateObject()};
+    auto root = cJSON_CreateObject();
+    DEFER(cJSON_Delete(root));
 
-    cJSON_AddStringToObject(*root, "unique_id", uniqueIdentifier.c_str());
+    cJSON_AddStringToObject(root, "unique_id", uniqueIdentifier.c_str());
 
-    auto device = cJSON_AddObjectToObject(*root, "device");
+    auto device = cJSON_AddObjectToObject(root, "device");
     cJSON_AddStringToObject(device, "manufacturer", CONFIG_MQTT_DEVICE_MANUFACTURER);
     cJSON_AddStringToObject(device, "model", CONFIG_MQTT_DEVICE_MODEL);
     cJSON_AddStringToObject(device, "name", _configuration.device_name.c_str());
     cJSON_AddStringToObject(device, "firmware_version", get_firmware_version().c_str());
 
-    publish_json(*root, _topic_prefix + "configuration", true);
+    publish_json(root, _topic_prefix + "configuration", true);
 }
 
 void MQTTConnection::publish_json(cJSON* root, const std::string& topic, bool retain) {
