@@ -9,6 +9,7 @@
 #include "esp_crt_bundle.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "strformat.h"
 
 #define LOG_TAG(v) [[maybe_unused]] static const char* TAG = #v
