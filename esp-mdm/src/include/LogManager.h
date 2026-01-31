@@ -31,6 +31,7 @@ class LogManager {
     std::string _device_entity_id;
     esp_timer_handle_t _log_timer;
     std::atomic<bool> _shutting_down;
+    esp_http_client_handle_t _client{};
 
     static int log_handler(const char* message, va_list va);
 
@@ -43,4 +44,6 @@ public:
 private:
     esp_err_t upload_logs();
     void start_timer();
+    esp_http_client_handle_t get_or_create_client();
+    void reset_client();
 };

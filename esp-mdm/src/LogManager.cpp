@@ -139,19 +139,21 @@ esp_err_t LogManager::upload_logs() {
             free(message.buffer);
         }
 
-        esp_http_client_config_t config = {
-            .url = _logging_url.c_str(),
-            .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
-            .crt_bundle_attach = esp_crt_bundle_attach,
-        };
+        auto client = get_or_create_client();
+        if (!client) {
+            ESP_LOGE(TAG, "Failed to init HTTP client");
+            return ESP_FAIL;
+        }
 
-        auto client = esp_http_client_init(&config);
-        ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG, "Failed to init HTTP client");
-        DEFER(esp_http_client_cleanup(client));
+        esp_http_client_set_method(client, HTTP_METHOD_POST);
+        esp_http_client_set_post_field(client, buffer.c_str(), buffer.length());
 
-        ESP_ERROR_RETURN(esp_http_client_set_method(client, HTTP_METHOD_POST));
-        ESP_ERROR_RETURN(esp_http_client_set_post_field(client, buffer.c_str(), buffer.length()));
-        ESP_ERROR_RETURN(esp_http_client_perform(client));
+        auto err = esp_http_client_perform(client);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "HTTP request failed: %s; resetting client", esp_err_to_name(err));
+            reset_client();
+            return err;
+        }
     }
 
     return ESP_OK;
@@ -160,5 +162,26 @@ esp_err_t LogManager::upload_logs() {
 void LogManager::start_timer() {
     if (!_instance->_shutting_down) {
         ESP_ERROR_CHECK(esp_timer_start_once(_log_timer, ESP_TIMER_MS(CONFIG_MDM_LOG_INTERVAL)));
+    }
+}
+
+esp_http_client_handle_t LogManager::get_or_create_client() {
+    if (!_client) {
+        esp_http_client_config_t config = {
+            .url = _logging_url.c_str(),
+            .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
+            .crt_bundle_attach = esp_crt_bundle_attach,
+            .keep_alive_enable = true,
+        };
+
+        _client = esp_http_client_init(&config);
+    }
+    return _client;
+}
+
+void LogManager::reset_client() {
+    if (_client) {
+        esp_http_client_cleanup(_client);
+        _client = nullptr;
     }
 }
