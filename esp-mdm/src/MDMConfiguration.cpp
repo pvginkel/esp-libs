@@ -35,6 +35,17 @@ esp_err_t MDMConfiguration::load() {
     ESP_ERROR_RETURN(nvs_get_string(handle, "wifi_password", _wifi_password));
     ESP_ERROR_RETURN(nvs_get_string(handle, "logging_url", _logging_url));
 
+    ESP_LOGI(TAG, "Configuration loaded:");
+    ESP_LOGI(TAG, "  device_key: %s", _device_key.c_str());
+    ESP_LOGI(TAG, "  client_id: %s", _client_id.c_str());
+    ESP_LOGI(TAG, "  client_secret: ***");
+    ESP_LOGI(TAG, "  token_url: %s", _token_url.c_str());
+    ESP_LOGI(TAG, "  base_url: %s", _base_url.c_str());
+    ESP_LOGI(TAG, "  mqtt_url: %s", _mqtt_url.c_str());
+    ESP_LOGI(TAG, "  wifi_ssid: %s", _wifi_ssid.c_str());
+    ESP_LOGI(TAG, "  wifi_password: %s", _wifi_password.c_str());
+    ESP_LOGI(TAG, "  logging_url: %s", _logging_url.c_str());
+
     if (!_base_url.ends_with('/')) {
         _base_url += '/';
     }
