@@ -6,6 +6,7 @@
 #include "defer.h"
 #include "error.h"
 #include "esp_check.h"
+#include "esp_crt_bundle.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "strformat.h"

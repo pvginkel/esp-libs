@@ -142,6 +142,7 @@ esp_err_t LogManager::upload_logs() {
         esp_http_client_config_t config = {
             .url = _logging_url.c_str(),
             .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
+            .crt_bundle_attach = esp_crt_bundle_attach,
         };
 
         auto client = esp_http_client_init(&config);

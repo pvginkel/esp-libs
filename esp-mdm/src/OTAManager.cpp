@@ -3,7 +3,6 @@
 #include "OTAManager.h"
 
 #include "esp_app_format.h"
-#include "esp_http_client.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 
@@ -60,6 +59,7 @@ esp_err_t OTAManager::install_firmware(OTAConfig& ota_config, bool& firmware_ins
         .url = ota_config.endpoint,
         .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
         .buffer_size_tx = 4096,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     ESP_LOGI(TAG, "Getting firmware from '%s'", config.url);
@@ -77,6 +77,12 @@ esp_err_t OTAManager::install_firmware(OTAConfig& ota_config, bool& firmware_ins
         return (esp_err_t)-length;
     }
 
+    const auto status_code = esp_http_client_get_status_code(client);
+    if (status_code != 200) {
+        ESP_LOGW(TAG, "Failed to get firmware; it may not be available; status code %d", status_code);
+        return ESP_OK;
+    }
+
     while (true) {
         auto read = esp_http_client_read(client, buffer.get(), BUFFER_SIZE);
         if (read < 0) {
@@ -90,7 +96,6 @@ esp_err_t OTAManager::install_firmware(OTAConfig& ota_config, bool& firmware_ins
                 ESP_RETURN_ON_ERROR(ESP_FAIL, TAG, "Stream not completely read");
             }
         }
-
         // If this is the first block we've read, parse the header.
         if (firmware_size == 0) {
             ESP_RETURN_ON_FALSE(

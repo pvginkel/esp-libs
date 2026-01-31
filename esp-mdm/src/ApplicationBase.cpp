@@ -113,6 +113,7 @@ esp_err_t ApplicationBase::ensure_access_token() {
     esp_http_client_config_t config = {
         .url = _mdm_configuration.get_token_url().c_str(),
         .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     auto client = esp_http_client_init(&config);
@@ -184,6 +185,7 @@ esp_err_t ApplicationBase::load_device_configuration() {
         .url = url.c_str(),
         .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
         .buffer_size_tx = 4096,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     ESP_LOGI(TAG, "Getting device configuration from %s", config.url);
@@ -317,6 +319,7 @@ esp_err_t ApplicationBase::handle_iotsupport_provisioning() {
         .url = url.c_str(),
         .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
         .buffer_size_tx = 4096,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     ESP_LOGI(TAG, "Getting provisioning data from %s", config.url);
