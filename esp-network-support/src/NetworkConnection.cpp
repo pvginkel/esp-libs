@@ -110,7 +110,7 @@ void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventI
 
         ESP_LOGW(TAG, "Disconnected from AP, reason %d", event->reason);
 
-        if (_attempt++ < CONFIG_NETWORK_WIFI_CONNECT_ATTEMPTS) {
+        if (!_have_connected && _attempt++ < CONFIG_NETWORK_WIFI_CONNECT_ATTEMPTS) {
             ESP_LOGI(TAG, "Retrying...");
             esp_wifi_connect();
         } else {
@@ -118,6 +118,10 @@ void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventI
         }
     } else if (eventBase == IP_EVENT && eventId == IP_EVENT_STA_GOT_IP) {
         auto event = (ip_event_got_ip_t*)eventData;
+
+        // We got an IP address. This means that we were able to connect successfully.
+        // If we get a disconnect after this point, we won't attempt to reconnect.
+        _have_connected = true;
 
         ESP_LOGI(TAG, "Got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 

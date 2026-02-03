@@ -22,6 +22,7 @@ class NetworkConnection {
     EventGroupHandle_t _wifi_event_group;
     Callback<NetworkConnectionState> _state_changed;
     int _attempt{};
+    bool _have_connected{};
     bool _have_sntp_synced{};
     esp_netif_t* _wifi_interface{};
 
