@@ -3,12 +3,11 @@
 #include "LogManager.h"
 
 #include "cJSON.h"
-#include "esp_http_client.h"
-#include "esp_wifi.h"
 
 constexpr auto BUFFER_SIZE = 1024;
-constexpr auto BLOCK_SIZE = 10;
 constexpr auto MAX_MESSAGES = 100;
+constexpr auto SHUTDOWN_TIMEOUT_MS = 5000;
+constexpr auto SHUTDOWN_POLL_INTERVAL_MS = 100;
 
 LOG_TAG(LogManager);
 
@@ -28,7 +27,7 @@ int LogManager::log_handler(const char* message, va_list va) {
 
     va_end(vaCopy);
 
-    return _instance->_mutex.with<int>([message, va]() {
+    auto result = _instance->_mutex.with<int>([message, va]() {
         while (_instance->_messages.size() > MAX_MESSAGES) {
             free(_instance->_messages[0].buffer);
             _instance->_messages.erase(_instance->_messages.begin());
@@ -36,45 +35,56 @@ int LogManager::log_handler(const char* message, va_list va) {
 
         auto result = vsnprintf(_buffer, BUFFER_SIZE, message, va);
 
-        bool startTimer = false;
-
         if (result >= 0 && result < BUFFER_SIZE) {
             auto buffer_copy = strdup(_buffer);
             ESP_ASSERT_CHECK(buffer_copy);
 
-            startTimer = !_instance->_device_entity_id.empty() && _instance->_messages.size() == 0;
-            _instance->_messages.push_back(Message(buffer_copy, esp_get_millis()));
-        }
-
-        if (startTimer) {
-            _instance->start_timer();
+            _instance->_messages.push_back(Message(buffer_copy));
         }
 
         return result;
     });
+
+    _instance->_signal.signal();
+
+    return result;
 }
 
-LogManager::LogManager() { _instance = this; }
+LogManager::LogManager(MQTTConnection& mqtt_connection) : _mqtt_connection(mqtt_connection) {
+    ESP_ASSERT_CHECK(!_instance);
 
-esp_err_t LogManager::begin(const std::string& logging_url) {
-    _logging_url = logging_url;
+    _instance = this;
+}
+
+esp_err_t LogManager::begin() {
     _default_log_handler = esp_log_set_vprintf(log_handler);
 
-    const esp_timer_create_args_t displayOffTimerArgs = {
-        .callback = [](void* arg) { ((LogManager*)arg)->upload_logs(); },
-        .arg = this,
-        .name = "logManagerTimer",
-    };
+    _mqtt_connection.on_connected_changed([this](auto state) {
+        if (state.connected) {
+            _signal.signal();
+        }
+    });
 
-    // Timer is application-lifetime; no cleanup needed.
-    ESP_ERROR_RETURN(esp_timer_create(&displayOffTimerArgs, &_log_timer));
+    xTaskCreate([](void* arg) { ((LogManager*)arg)->task_loop(); }, "log_manager", CONFIG_MDM_LOG_TASK_STACK_SIZE, this,
+                1, &_task_handle);
 
     esp_register_shutdown_handler([]() {
         if (_instance) {
-            ESP_LOGI(TAG, "Uploading log messages before restart");
+            ESP_LOGI(TAG, "Flushing log messages before restart");
 
             _instance->_shutting_down = true;
-            _instance->upload_logs();
+            _instance->_signal.signal();
+
+            // Wait for messages to drain, polling every 100ms for up to 5 seconds.
+            auto elapsed = 0;
+            while (elapsed < SHUTDOWN_TIMEOUT_MS && _instance->get_message_count() > 0) {
+                vTaskDelay(pdMS_TO_TICKS(SHUTDOWN_POLL_INTERVAL_MS));
+                elapsed += SHUTDOWN_POLL_INTERVAL_MS;
+            }
+
+            if (_instance->get_message_count() > 0) {
+                ESP_LOGW(TAG, "Shutdown timeout; dropping remaining log messages");
+            }
         }
     });
 
@@ -82,106 +92,77 @@ esp_err_t LogManager::begin(const std::string& logging_url) {
 }
 
 void LogManager::set_device_entity_id(const std::string& device_entity_id) {
-    auto startTimer = _mutex.with<bool>([this, &device_entity_id]() {
-        _device_entity_id = device_entity_id;
+    _mutex.with<void>([this, &device_entity_id]() { _device_entity_id = device_entity_id; });
 
-        return _messages.size() > 0;
-    });
+    _signal.signal();
+}
 
-    if (startTimer) {
-        this->start_timer();
+bool LogManager::can_send() {
+    return _mqtt_connection.is_connected() && _mutex.with<bool>([this]() { return !_device_entity_id.empty(); });
+}
+
+size_t LogManager::get_message_count() {
+    return _mutex.with<size_t>([this]() { return _messages.size(); });
+}
+
+void LogManager::task_loop() {
+    while (true) {
+        // Wake up on signal or every second to retry failed publishes.
+        _signal.wait(pdMS_TO_TICKS(1000));
+
+        publish_messages();
     }
 }
 
-esp_err_t LogManager::upload_logs() {
-    auto messages = _mutex.with<std::vector<Message>>([this]() {
-        if (_device_entity_id.empty()) {
-            return std::vector<Message>();
+void LogManager::publish_messages() {
+    constexpr int MAX_BATCH_SIZE = 10;
+
+    while (can_send()) {
+        // Pop up to MAX_BATCH_SIZE messages from the queue.
+        std::vector<char*> buffers;
+        std::string entity_id;
+
+        _mutex.with<void>([this, &buffers, &entity_id]() {
+            entity_id = _device_entity_id;
+
+            while (!_messages.empty() && buffers.size() < MAX_BATCH_SIZE) {
+                buffers.push_back(_messages[0].buffer);
+                _messages.erase(_messages.begin());
+            }
+        });
+
+        if (buffers.empty()) {
+            break;
         }
 
-        auto messages = _messages;
-
-        _messages.clear();
-
-        return messages;
-    });
-
-    std::string buffer;
-    size_t offset = 0;
-
-    while (offset < messages.size()) {
-        buffer.clear();
-
-        auto millis = esp_get_millis();
-
-        for (auto i = 0; i < BLOCK_SIZE; i++) {
-            auto index = offset++;
-            if (index >= messages.size()) {
-                break;
-            }
-
-            auto message = messages[index];
-
+        // Build NDJSON payload.
+        std::string payload;
+        for (auto buffer : buffers) {
             auto root = cJSON_CreateObject();
-
-            cJSON_AddStringToObject(root, "message", message.buffer);
-            cJSON_AddNumberToObject(root, "relative_time", double(millis - message.time));
-            cJSON_AddStringToObject(root, "entity_id", _device_entity_id.c_str());
+            cJSON_AddStringToObject(root, "message", buffer);
+            cJSON_AddStringToObject(root, "entity_id", entity_id.c_str());
 
             auto json = cJSON_PrintUnformatted(root);
             cJSON_Delete(root);
 
-            buffer.append(json);
-            buffer.append("\n");
+            payload += json;
+            payload += '\n';
 
             cJSON_free(json);
-
-            free(message.buffer);
         }
 
-        auto client = get_or_create_client();
-        if (!client) {
-            ESP_LOGE(TAG, "Failed to init HTTP client");
-            return ESP_FAIL;
+        auto success = _mqtt_connection.publish(CONFIG_MDM_LOG_TOPIC, payload, 1, false);
+
+        for (auto buffer : buffers) {
+            free(buffer);
         }
 
-        esp_http_client_set_method(client, HTTP_METHOD_POST);
-        esp_http_client_set_post_field(client, buffer.c_str(), buffer.length());
-
-        auto err = esp_http_client_perform(client);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "HTTP request failed: %s; resetting client", esp_err_to_name(err));
-            reset_client();
-            return err;
+        if (!success) {
+            // MQTT client is overwhelmed, back off and retry later.
+            break;
         }
-    }
 
-    return ESP_OK;
-}
-
-void LogManager::start_timer() {
-    if (!_instance->_shutting_down) {
-        ESP_ERROR_CHECK(esp_timer_start_once(_log_timer, ESP_TIMER_MS(CONFIG_MDM_LOG_INTERVAL)));
-    }
-}
-
-esp_http_client_handle_t LogManager::get_or_create_client() {
-    if (!_client) {
-        esp_http_client_config_t config = {
-            .url = _logging_url.c_str(),
-            .timeout_ms = CONFIG_NETWORK_RECEIVE_TIMEOUT,
-            .crt_bundle_attach = esp_crt_bundle_attach,
-            .keep_alive_enable = true,
-        };
-
-        _client = esp_http_client_init(&config);
-    }
-    return _client;
-}
-
-void LogManager::reset_client() {
-    if (_client) {
-        esp_http_client_cleanup(_client);
-        _client = nullptr;
+        // Yield to allow MQTT client to process ACKs.
+        taskYIELD();
     }
 }

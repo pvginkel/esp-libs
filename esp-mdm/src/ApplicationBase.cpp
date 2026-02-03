@@ -14,7 +14,8 @@
 
 LOG_TAG(ApplicationBase);
 
-ApplicationBase::ApplicationBase() : _network_connection(&_queue), _mqtt_connection(&_queue) {}
+ApplicationBase::ApplicationBase()
+    : _network_connection(&_queue), _mqtt_connection(&_queue), _log_manager(_mqtt_connection) {}
 
 void ApplicationBase::begin(bool silent) {
     ESP_ERROR_CHECK(setup_flash());
@@ -29,7 +30,7 @@ void ApplicationBase::begin(bool silent) {
 
     ESP_LOGI(TAG, "Setting up the log manager");
 
-    ESP_ERROR_CHECK(_log_manager.begin(_mdm_configuration.get_logging_url()));
+    ESP_ERROR_CHECK(_log_manager.begin());
 }
 
 esp_err_t ApplicationBase::setup_flash() {

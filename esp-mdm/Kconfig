@@ -1,7 +1,11 @@
 menu "MDM Configuration"
 
-    config MDM_LOG_INTERVAL
-        int "Interval to upload log messages in ms"
-        default 5000
+    config MDM_LOG_TOPIC
+        string "MQTT topic for log messages"
+        default "iotsupport/logsink"
+
+    config MDM_LOG_TASK_STACK_SIZE
+        int "Stack size for log manager task"
+        default 4096
 
 endmenu

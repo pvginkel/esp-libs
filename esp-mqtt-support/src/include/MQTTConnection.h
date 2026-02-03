@@ -70,13 +70,16 @@ class MQTTConnection {
     std::map<std::string, std::function<void(const std::string&)>> _command_callbacks;
     std::map<std::string, std::function<void(const std::string&)>> _topic_callbacks;
     std::set<std::string> _published_discovery_topics;
+    bool _connected{};
+    int64_t _last_qos_publish_time{};
 
 public:
     MQTTConnection(Queue* queue);
 
     void set_configuration(MQTTConfiguration configuration) { _configuration = configuration; }
     void begin();
-    bool is_connected() { return !!_client; }
+    bool is_connected() { return _connected; }
+    bool publish(const std::string& topic, const std::string& payload, int qos = 1, bool retain = false);
     void send_state();
     void send_state(cJSON* data);
     void on_connected_changed(std::function<void(MQTTConnectionState)> func) { _connected_changed.add(func); }
@@ -103,4 +106,5 @@ private:
     void register_callback(const char* object_id, std::function<void(const std::string&)> callback);
     bool handle_discovery_prune(const std::string& topic, bool empty_message);
     std::string get_firmware_version();
+    int publish_with_retry(const char* topic, const char* data, int len, int qos, bool retain);
 };

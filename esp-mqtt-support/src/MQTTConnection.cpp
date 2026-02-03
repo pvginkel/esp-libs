@@ -7,6 +7,9 @@
 #include "defer.h"
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 LOG_TAG(MQTTConnection);
 
@@ -114,6 +117,7 @@ void MQTTConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, 
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT disconnected");
 
+            _connected = false;
             _connected_changed.queue(_queue, {false});
             break;
 
@@ -166,6 +170,7 @@ void MQTTConnection::handle_connected() {
     subscribe(discovery_topic);
     _queue->enqueue_delayed([this, discovery_topic]() { unsubscribe(discovery_topic); }, 60000);
 
+    _connected = true;
     _connected_changed.call({true});
 }
 
@@ -255,7 +260,7 @@ void MQTTConnection::publish_configuration() {
 void MQTTConnection::publish_json(cJSON* root, const std::string& topic, bool retain) {
     auto json = cJSON_PrintUnformatted(root);
 
-    ESP_ASSERT_CHECK(esp_mqtt_client_publish(_client, topic.c_str(), json, 0, QOS_MIN_ONE, retain) >= 0);
+    publish_with_retry(topic.c_str(), json, 0, QOS_MIN_ONE, retain);
 
     cJSON_free(json);
 }
@@ -413,7 +418,7 @@ bool MQTTConnection::handle_discovery_prune(const std::string& topic, bool empty
 
     if (!empty_message && _published_discovery_topics.find(topic) == _published_discovery_topics.end()) {
         ESP_LOGI(TAG, "Pruning stale discovery topic %s", topic.c_str());
-        ESP_ASSERT_CHECK(esp_mqtt_client_publish(_client, topic.c_str(), "", 0, QOS_MIN_ONE, true) >= 0);
+        publish_with_retry(topic.c_str(), "", 0, QOS_MIN_ONE, true);
     }
 
     return true;
@@ -444,10 +449,52 @@ void MQTTConnection::send_state(cJSON* data) {
     auto json = cJSON_PrintUnformatted(data);
 
     auto topic = _topic_prefix + "state";
-    auto result = esp_mqtt_client_publish(_client, topic.c_str(), json, 0, QOS_MIN_ONE, true);
-    if (result < 0) {
-        ESP_LOGE(TAG, "Sending status update message failed with error %d", result);
-    }
+    publish_with_retry(topic.c_str(), json, 0, QOS_MIN_ONE, true);
 
     cJSON_free(json);
+}
+
+bool MQTTConnection::publish(const std::string& topic, const std::string& payload, int qos, bool retain) {
+    if (!_client) {
+        ESP_LOGD(TAG, "Cannot publish, client not initialized");
+        return false;
+    }
+
+    auto result = publish_with_retry(topic.c_str(), payload.c_str(), payload.length(), qos, retain);
+    if (result < 0) {
+        ESP_LOGD(TAG, "Publish to %s failed with error %d", topic.c_str(), result);
+        return false;
+    }
+
+    return true;
+}
+
+int MQTTConnection::publish_with_retry(const char* topic, const char* data, int len, int qos, bool retain) {
+    constexpr int64_t MIN_QOS_INTERVAL_US = 20000;  // 20ms between QoS > 0 messages
+    constexpr int MAX_RETRIES = 5;
+    constexpr int RETRY_DELAY_MS = 200;
+
+    if (qos > 0) {
+        auto now = esp_timer_get_time();
+        auto elapsed = now - _last_qos_publish_time;
+        if (elapsed < MIN_QOS_INTERVAL_US) {
+            vTaskDelay(pdMS_TO_TICKS((MIN_QOS_INTERVAL_US - elapsed) / 1000));
+        }
+        _last_qos_publish_time = esp_timer_get_time();
+    }
+
+    for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        auto result = esp_mqtt_client_publish(_client, topic, data, len, qos, retain);
+        if (result >= 0) {
+            return result;
+        }
+
+        if (attempt < MAX_RETRIES - 1) {
+            ESP_LOGD(TAG, "Publish failed (attempt %d/%d), retrying in %dms", attempt + 1, MAX_RETRIES, RETRY_DELAY_MS);
+            vTaskDelay(pdMS_TO_TICKS(RETRY_DELAY_MS));
+        }
+    }
+
+    ESP_LOGW(TAG, "Publish to %s failed after %d attempts", topic, MAX_RETRIES);
+    return -1;
 }

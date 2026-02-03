@@ -8,42 +8,43 @@
 #include <string>
 #include <vector>
 
+#include "MQTTConnection.h"
 #include "Mutex.h"
-#include "esp_http_client.h"
+#include "Signal.h"
 #include "esp_log.h"
-#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 class LogManager {
     struct Message {
         char* buffer;
-        int64_t time;
 
-        Message(char* buffer, int64_t time) : buffer(buffer), time(time) {}
+        explicit Message(char* buffer) : buffer(buffer) {}
     };
 
     static LogManager* _instance;
     static char* _buffer;
 
-    std::string _logging_url;
+    MQTTConnection& _mqtt_connection;
     vprintf_like_t _default_log_handler{};
     Mutex _mutex;
     std::vector<Message> _messages;
     std::string _device_entity_id;
-    esp_timer_handle_t _log_timer;
-    std::atomic<bool> _shutting_down;
-    esp_http_client_handle_t _client{};
+    std::atomic<bool> _shutting_down{};
+    Signal _signal;
+    TaskHandle_t _task_handle{};
 
     static int log_handler(const char* message, va_list va);
 
 public:
-    LogManager();
+    explicit LogManager(MQTTConnection& mqtt_connection);
 
-    esp_err_t begin(const std::string& logging_url);
+    esp_err_t begin();
     void set_device_entity_id(const std::string& device_entity_id);
 
 private:
-    esp_err_t upload_logs();
-    void start_timer();
-    esp_http_client_handle_t get_or_create_client();
-    void reset_client();
+    bool can_send();
+    void task_loop();
+    void publish_messages();
+    size_t get_message_count();
 };
