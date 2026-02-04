@@ -33,6 +33,7 @@ public:
     void begin(bool silent);
     void process();
 
+    const std::string& get_authorization();
     Queue& get_queue() { return _queue; }
     MQTTConnection& get_mqtt_connection() { return _mqtt_connection; }
     bool is_silent_startup() { return _silent_startup; }

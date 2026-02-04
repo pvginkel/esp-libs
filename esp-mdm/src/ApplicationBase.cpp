@@ -355,3 +355,9 @@ void ApplicationBase::process() {
 
     do_process();
 }
+
+const std::string& ApplicationBase::get_authorization() {
+    ESP_ERROR_CHECK(ensure_access_token());
+
+    return _authorization;
+}
