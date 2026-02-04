@@ -85,6 +85,7 @@ public:
     void on_connected_changed(std::function<void(MQTTConnectionState)> func) { _connected_changed.add(func); }
     void on_publish_discovery(std::function<void()> func) { _publish_discovery.add(func); }
     void subscribe(const std::string& topic, std::function<void(const std::string&)> callback);
+    void register_callback(const char* object_id, std::function<void(const std::string&)> callback);
     void publish_button_discovery(MQTTDiscovery metadata, std::function<void()> command_func);
     void publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensorDiscovery component_metadata);
     void publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitchDiscovery component_metadata,
@@ -103,7 +104,6 @@ private:
     void publish_json(cJSON* root, const std::string& topic, bool retain);
     void publish_discovery(const char* component, const MQTTDiscovery& metadata,
                            std::function<void(cJSON* json, const char* object_id)> func);
-    void register_callback(const char* object_id, std::function<void(const std::string&)> callback);
     bool handle_discovery_prune(const std::string& topic, bool empty_message);
     std::string get_firmware_version();
     int publish_with_retry(const char* topic, const char* data, int len, int qos, bool retain);

@@ -18,6 +18,8 @@ ApplicationBase::ApplicationBase()
     : _network_connection(&_queue), _mqtt_connection(&_queue), _log_manager(_mqtt_connection) {}
 
 void ApplicationBase::begin(bool silent) {
+    _silent_startup = silent;
+
     ESP_ERROR_CHECK(setup_flash());
 
     ESP_LOGI(TAG, "Loading provisioning data");
@@ -52,6 +54,8 @@ void ApplicationBase::begin_network() {
             begin_network_available();
         } else {
             ESP_LOGE(TAG, "Failed to connect to WiFi; restarting");
+
+            do_network_connection_failed();
             esp_restart();
         }
     });

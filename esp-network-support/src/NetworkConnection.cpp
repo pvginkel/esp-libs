@@ -130,7 +130,7 @@ void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventI
 }
 
 void NetworkConnection::setup_sntp() {
-#if CONFIG_ENABLE_SNTP
+#if CONFIG_NETWORK_ENABLE_SNTP
 
     ESP_LOGI(TAG, "Initializing SNTP");
 

@@ -15,6 +15,7 @@ class ApplicationBase {
     MDMConfiguration _mdm_configuration;
     Callback<void> _begin;
     Callback<void> _network_available;
+    Callback<void> _network_connection_failed;
     Callback<void> _ready;
     Callback<cJSON*> _configuration_loaded;
     Callback<void> _process;
@@ -24,6 +25,7 @@ class ApplicationBase {
     std::string _device_name;
     std::string _device_entity_id;
     bool _enable_ota{};
+    bool _silent_startup;
 
 public:
     ApplicationBase();
@@ -33,15 +35,18 @@ public:
 
     Queue& get_queue() { return _queue; }
     MQTTConnection& get_mqtt_connection() { return _mqtt_connection; }
+    bool is_silent_startup() { return _silent_startup; }
 
     void on_begin(std::function<void()> func) { _begin.add(func); }
     void on_network_available(std::function<void()> func) { _network_available.add(func); }
+    void on_network_connection_failed(std::function<void()> func) { _network_connection_failed.add(func); }
     void on_ready(std::function<void()> func) { _ready.add(func); }
     void on_configuration_loaded(std::function<void(cJSON*)> func) { _configuration_loaded.add(func); }
 
 protected:
     virtual void do_begin() { _begin.call(); }
     virtual void do_network_available() { _network_available.call(); }
+    virtual void do_network_connection_failed() { _network_connection_failed.call(); }
     virtual void do_ready() { _ready.call(); }
     virtual void do_configuration_loaded(cJSON* data) { _configuration_loaded.call(data); }
     virtual void do_process() { _process.call(); }
