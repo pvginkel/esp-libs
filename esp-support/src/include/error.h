@@ -60,3 +60,15 @@
         }                                                                                                      \
     } while (0)
 #endif
+
+#define FREERTOS_CHECK(x)                                                                                            \
+    do {                                                                                                             \
+        const auto __FreeRTOS_result = (x);                                                                          \
+        if (__FreeRTOS_result != pdPASS) {                                                                           \
+            printf("FREERTOS_CHECK failed");                                                                         \
+            printf(" at %p\n", __builtin_return_address(0));                                                         \
+            printf("file: \"%s\" line %d\nfunc: %s\nexpression: %s\nerror: %d\n", __FILE__, __LINE__, __ASSERT_FUNC, \
+                   #x, (int)__FreeRTOS_result);                                                                      \
+            abort();                                                                                                 \
+        }                                                                                                            \
+    } while (0)

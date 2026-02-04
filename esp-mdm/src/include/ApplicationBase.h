@@ -31,6 +31,7 @@ public:
     void begin(bool silent);
     void process();
 
+    Queue& get_queue() { return _queue; }
     MQTTConnection& get_mqtt_connection() { return _mqtt_connection; }
 
     void on_begin(std::function<void()> func) { _begin.add(func); }
