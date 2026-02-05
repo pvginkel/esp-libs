@@ -8,6 +8,10 @@
 #include "sdkconfig.h"
 #include "strformat.h"
 
+#ifndef CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC
+#error CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC must be configured
+#endif
+
 LOG_TAG(NetworkConnection);
 
 NetworkConnection* NetworkConnection::_instance = nullptr;
