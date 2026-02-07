@@ -65,8 +65,8 @@ esp_err_t LogManager::begin() {
         }
     });
 
-    xTaskCreate([](void* arg) { ((LogManager*)arg)->task_loop(); }, "log_manager", CONFIG_MDM_LOG_TASK_STACK_SIZE, this,
-                1, &_task_handle);
+    xTaskCreatePinnedToCore([](void* arg) { ((LogManager*)arg)->task_loop(); }, "log_manager",
+                            CONFIG_MDM_LOG_TASK_STACK_SIZE, this, 1, &_task_handle, CONFIG_MDM_LOG_TASK_CORE_ID);
 
     esp_register_shutdown_handler([]() {
         if (_instance) {

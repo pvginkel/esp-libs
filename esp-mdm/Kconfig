@@ -8,4 +8,8 @@ menu "MDM Configuration"
         int "Stack size for log manager task"
         default 4096
 
+    config MDM_LOG_TASK_CORE_ID
+        int "Core ID for log manager task"
+        default 0
+
 endmenu
