@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdio>
 #include <string>
 #include <type_traits>
-#include <cstdio>
+
+#include "error.h"
 
 namespace detail {
 
@@ -20,10 +22,7 @@ auto to_printf_arg(T&& arg) {
 template <typename... Args>
 std::string strformat(const char* fmt, Args&&... args) {
     auto length = snprintf(nullptr, 0, fmt, detail::to_printf_arg(std::forward<Args>(args))...);
-
-    if (length < 0) {
-        abort();
-    }
+    ESP_ASSERT_CHECK(length >= 0);
 
     std::string result(length, '\0');
     snprintf(result.data(), length + 1, fmt, detail::to_printf_arg(std::forward<Args>(args))...);

@@ -30,7 +30,7 @@ class ApplicationBase {
 public:
     ApplicationBase();
 
-    void begin(bool silent);
+    void begin();
     void process();
 
     const std::string& get_authorization();

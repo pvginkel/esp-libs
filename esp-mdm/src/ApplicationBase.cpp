@@ -17,8 +17,9 @@ LOG_TAG(ApplicationBase);
 ApplicationBase::ApplicationBase()
     : _network_connection(&_queue), _mqtt_connection(&_queue), _log_manager(_mqtt_connection) {}
 
-void ApplicationBase::begin(bool silent) {
-    _silent_startup = silent;
+void ApplicationBase::begin() {
+    const auto reset_reason = esp_reset_reason();
+    _silent_startup = reset_reason == ESP_RST_BROWNOUT || reset_reason == ESP_RST_WDT;
 
     ESP_ERROR_CHECK(setup_flash());
 
