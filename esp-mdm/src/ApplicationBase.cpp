@@ -14,6 +14,11 @@
 
 LOG_TAG(ApplicationBase);
 
+// We register a shutdown handler very late. It'll be the first one called on
+// a software reset. This handler sets the below field to true. This is
+// used to signal a "clean" shutdown.
+bool _shutdown_initiated{};
+
 ApplicationBase::ApplicationBase()
     : _network_connection(&_queue), _mqtt_connection(&_queue), _log_manager(_mqtt_connection) {}
 
@@ -53,7 +58,7 @@ void ApplicationBase::begin_network() {
     _network_connection.on_state_changed([this](auto state) {
         if (state.connected) {
             begin_network_available();
-        } else {
+        } else if (!_shutdown_initiated) {
             ESP_LOGE(TAG, "Failed to connect to WiFi; restarting");
 
             do_network_connection_failed();
@@ -265,7 +270,17 @@ void ApplicationBase::begin_after_initialization() {
 
     ESP_LOGI(TAG, "Startup complete");
 
+    register_shutdown_notification();
+
     do_ready();
+}
+
+void ApplicationBase::register_shutdown_notification() {
+    esp_register_shutdown_handler([]() {
+        ESP_LOGI(TAG, "Shutdown initiated");
+
+        _shutdown_initiated = true;
+    });
 }
 
 void ApplicationBase::setup_mqtt_subscriptions() {

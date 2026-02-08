@@ -189,34 +189,36 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
         return;
     }
 
-    // Check for custom topic subscriptions.
-    auto topic_it = _topic_callbacks.find(topic);
-    if (topic_it != _topic_callbacks.end()) {
-        auto data = event->data_len ? std::string(event->data, event->data_len) : std::string();
-        topic_it->second(data);
-        return;
-    }
+    auto data = event->data_len ? std::string(event->data, event->data_len) : std::string();
 
-    if (!topic.starts_with(_topic_prefix)) {
-        ESP_LOGE(TAG, "Unexpected topic %s topic len %d data len %d", topic.c_str(), event->topic_len, event->data_len);
-        return;
-    }
+    _queue->enqueue([this, topic, data]() {
+        // Check for custom topic subscriptions.
+        auto topic_it = _topic_callbacks.find(topic);
+        if (topic_it != _topic_callbacks.end()) {
+            topic_it->second(data);
+            return;
+        }
 
-    auto sub_topic = topic.substr(_topic_prefix.length());
+        if (!topic.starts_with(_topic_prefix)) {
+            ESP_LOGE(TAG, "Unexpected topic %s topic len %d data len %d", topic.c_str(), topic.length(), data.length());
+            return;
+        }
 
-    if (!sub_topic.starts_with("set/")) {
-        ESP_LOGE(TAG, "Unknown topic %s", topic.c_str());
-        return;
-    }
+        auto sub_topic = topic.substr(_topic_prefix.length());
 
-    auto object_id = sub_topic.substr(4);
-    auto it = _command_callbacks.find(object_id);
-    if (it != _command_callbacks.end()) {
-        auto data = event->data_len ? std::string(event->data, event->data_len) : std::string();
-        it->second(data);
-    } else {
-        ESP_LOGW(TAG, "No callback registered for object_id '%s'", object_id.c_str());
-    }
+        if (!sub_topic.starts_with("set/")) {
+            ESP_LOGE(TAG, "Unknown topic %s", topic.c_str());
+            return;
+        }
+
+        auto object_id = sub_topic.substr(4);
+        auto it = _command_callbacks.find(object_id);
+        if (it != _command_callbacks.end()) {
+            it->second(data);
+        } else {
+            ESP_LOGW(TAG, "No callback registered for object_id '%s'", object_id.c_str());
+        }
+    });
 }
 
 void MQTTConnection::subscribe(const std::string& topic) {

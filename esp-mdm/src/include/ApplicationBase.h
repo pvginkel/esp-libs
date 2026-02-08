@@ -65,4 +65,5 @@ private:
     void handle_iotsupport_update(const std::string& data, const char* update_type);
     esp_err_t handle_iotsupport_provisioning();
     void begin_after_initialization();
+    void register_shutdown_notification();
 };

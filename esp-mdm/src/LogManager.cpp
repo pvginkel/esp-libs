@@ -8,6 +8,7 @@ constexpr auto BUFFER_SIZE = 1024;
 constexpr auto MAX_MESSAGES = 100;
 constexpr auto SHUTDOWN_TIMEOUT_MS = 5000;
 constexpr auto SHUTDOWN_POLL_INTERVAL_MS = 100;
+constexpr auto RETRY_PUBLISH_INTERVAL_MS = 1000;
 
 LOG_TAG(LogManager);
 
@@ -77,10 +78,10 @@ esp_err_t LogManager::begin() {
 
             // Wait for messages to drain, polling every 100ms for up to 5 seconds.
             auto elapsed = 0;
-            while (elapsed < SHUTDOWN_TIMEOUT_MS && _instance->get_message_count() > 0) {
+            do {
                 vTaskDelay(pdMS_TO_TICKS(SHUTDOWN_POLL_INTERVAL_MS));
                 elapsed += SHUTDOWN_POLL_INTERVAL_MS;
-            }
+            } while (elapsed < SHUTDOWN_TIMEOUT_MS && _instance->get_message_count() > 0);
 
             if (_instance->get_message_count() > 0) {
                 ESP_LOGW(TAG, "Shutdown timeout; dropping remaining log messages");
@@ -107,8 +108,7 @@ size_t LogManager::get_message_count() {
 
 void LogManager::task_loop() {
     while (true) {
-        // Wake up on signal or every second to retry failed publishes.
-        _signal.wait(pdMS_TO_TICKS(1000));
+        _signal.wait();
 
         publish_messages();
     }
@@ -151,15 +151,20 @@ void LogManager::publish_messages() {
             cJSON_free(json);
         }
 
-        auto success = _mqtt_connection.publish(CONFIG_MDM_LOG_TOPIC, payload, 1, false);
+        while (true) {
+            auto success = _mqtt_connection.publish(CONFIG_MDM_LOG_TOPIC, payload, 1, false);
+            if (success) {
+                break;
+            }
+
+            // We retry indefinitely. There is no point in doing anything else. At
+            // some point either we will be able to get these messages out, or, we'll
+            // restart.
+            vTaskDelay(pdMS_TO_TICKS(RETRY_PUBLISH_INTERVAL_MS));
+        }
 
         for (auto buffer : buffers) {
             free(buffer);
-        }
-
-        if (!success) {
-            // MQTT client is overwhelmed, back off and retry later.
-            break;
         }
 
         // Yield to allow MQTT client to process ACKs.
