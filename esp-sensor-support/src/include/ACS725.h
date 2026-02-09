@@ -32,7 +32,7 @@ public:
     ACS725(Queue* queue) : _queue(queue) {}
 
     // report_interval_ms: interval at which the current is reported
-    esp_err_t begin(uint32_t report_interval_ms);
+    esp_err_t begin(int pin, uint32_t report_interval_ms);
 
     // Register a callback to get notified of RMS current (A) measurement samples.
     void on_current_changed(std::function<void(float)> func) { _current_changed.add(func); }
