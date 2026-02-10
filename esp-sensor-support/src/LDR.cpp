@@ -12,15 +12,12 @@ LOG_TAG(LDR);
 
 // -------------------- USER-TUNABLE COMPILE-TIME CONFIG --------------------
 
-// We sample off of a base frequency of 1 kHz. The multiplier increases this.
-#define LDR_SAMPLE_FREQ_MULTIPLIER 4
-
 // ADC attenuation / bitwidth
 #define LDR_ADC_ATTEN ADC_ATTEN_DB_12
 #define LDR_ADC_BITWIDTH SOC_ADC_DIGI_MAX_BITWIDTH
 
 // Continuous mode configuration
-#define LDR_SAMPLE_FREQ_HZ (5 * LDR_SAMPLE_FREQ_MULTIPLIER)
+#define LDR_SAMPLE_FREQ_HZ SOC_ADC_SAMPLE_FREQ_THRES_LOW
 #define LDR_DMA_BUFFER_SIZE 256
 #define LDR_DMA_BUFFER_COUNT 4
 
@@ -132,15 +129,15 @@ void LDR::process_samples(const uint8_t* buffer, uint32_t len) {
     }
 }
 
-// Assumes voltage divider: VCC --- [R_fixed] --- [ADC] --- [LDR] --- GND
-// R_ldr = R_fixed * V / (VCC - V)
+// Assumes voltage divider: VCC --- [LDR] --- [ADC] --- [R_fixed] --- GND
+// R_ldr = R_fixed * (VCC - V) / V
 // lux = 10 * (R_ldr / R_10)^(-1/gamma)
 float LDR::mv_to_lux(float mv) {
     if (mv <= 0 || mv >= LDR_VCC_MV) {
         return 0;
     }
 
-    const float r_ldr = _divider_resistance * mv / (LDR_VCC_MV - mv);
+    const float r_ldr = _divider_resistance * (LDR_VCC_MV - mv) / mv;
     if (r_ldr <= 0) {
         return 0;
     }

@@ -29,7 +29,9 @@ public:
     // resistance_at_10_lux: the LDR resistance at 10 lux (ohms), from the datasheet
     // gamma: LDR gamma coefficient (typically 0.6-0.8)
     LDR(Queue* queue, float divider_resistance, float resistance_at_10_lux, float gamma)
-        : _queue(queue), _divider_resistance(divider_resistance), _resistance_at_10_lux(resistance_at_10_lux),
+        : _queue(queue),
+          _divider_resistance(divider_resistance),
+          _resistance_at_10_lux(resistance_at_10_lux),
           _gamma(gamma) {}
 
     esp_err_t begin(int pin, uint32_t report_interval_ms);

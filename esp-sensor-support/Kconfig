@@ -1,0 +1,18 @@
+menu "Sensor Configuration"
+
+    config SEN0626_GESTURE_THRESHOLD
+        int "SEN0626 gesture score threshold (0-100)"
+        range 0 100
+        default 60
+
+    config SEN0626_FACE_SCORE_THRESHOLD
+        int "SEN0626 face score threshold (0-100)"
+        range 0 100
+        default 60
+
+    config SEN0626_DETECT_THRESHOLD
+        int "SEN0626 detection threshold (0-100)"
+        range 0 100
+        default 100
+
+endmenu
