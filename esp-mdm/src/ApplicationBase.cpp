@@ -2,6 +2,7 @@
 
 #include "ApplicationBase.h"
 
+#include "CoreDumpUploader.h"
 #include "OTAManager.h"
 #include "cJSON.h"
 #include "driver/i2c.h"
@@ -11,6 +12,7 @@
 #define DEVICE_CONFIGURATION_URL "api/iot/config"
 #define DEVICE_PROVISIONING_URL "api/iot/provisioning"
 #define DEVICE_FIRMWARE_URL "api/iot/firmware"
+#define DEVICE_COREDUMP_URL "api/iot/coredump"
 
 LOG_TAG(ApplicationBase);
 
@@ -76,6 +78,10 @@ void ApplicationBase::begin_network_available() {
     ESP_ERROR_CHECK(load_device_configuration());
 
     _log_manager.set_device_entity_id(_device_entity_id);
+
+    ESP_LOGI(TAG, "Checking for core dump to upload");
+
+    ESP_ERROR_CHECK(upload_core_dump());
 
     ESP_LOGI(TAG, "Checking for firmware update");
 
@@ -376,4 +382,11 @@ const std::string& ApplicationBase::get_authorization() {
     ESP_ERROR_CHECK(ensure_access_token());
 
     return _authorization;
+}
+
+esp_err_t ApplicationBase::upload_core_dump() {
+    const auto url = _mdm_configuration.get_base_url() + DEVICE_COREDUMP_URL;
+    CoreDumpUploader core_dump_uploader(this, url.c_str());
+
+    return core_dump_uploader.upload();
 }

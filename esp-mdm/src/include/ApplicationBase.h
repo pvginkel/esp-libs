@@ -66,4 +66,5 @@ private:
     esp_err_t handle_iotsupport_provisioning();
     void begin_after_initialization();
     void register_shutdown_notification();
+    esp_err_t upload_core_dump();
 };
