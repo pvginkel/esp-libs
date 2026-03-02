@@ -121,9 +121,25 @@ void MQTTConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, 
             _connected_changed.queue(_queue, {false});
             break;
 
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT subscribed error %d", (int)event->error_handle->error_type);
+        case MQTT_EVENT_SUBSCRIBED: {
+            const auto error_type = event->error_handle ? (int)event->error_handle->error_type : 0;
+            if (error_type) {
+                ESP_LOGI(TAG, "MQTT subscribed error %d", error_type);
+            } else {
+                ESP_LOGI(TAG, "MQTT subscribed");
+            }
+
+            auto callback_it = _subscribed_callbacks.find(event->msg_id);
+            if (callback_it != _subscribed_callbacks.end()) {
+                auto cb = std::move(callback_it->second);
+                _subscribed_callbacks.erase(callback_it);
+
+                if (error_type == 0) {
+                    cb();
+                }
+            }
             break;
+        }
 
         case MQTT_EVENT_UNSUBSCRIBED:
             ESP_LOGI(TAG, "MQTT unsubscribed");
@@ -159,7 +175,10 @@ void MQTTConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, 
 }
 
 void MQTTConnection::handle_connected() {
-    subscribe(_topic_prefix + "set/#");
+    subscribe(_topic_prefix + "set/#", [this]() {
+        _connected = true;
+        _connected_changed.call({true});
+    });
 
     publish_configuration();
 
@@ -169,9 +188,6 @@ void MQTTConnection::handle_connected() {
     auto discovery_topic = strformat("homeassistant/+/%s/+/config", _device_id);
     subscribe(discovery_topic);
     _queue->enqueue_delayed([this, discovery_topic]() { unsubscribe(discovery_topic); }, 60000);
-
-    _connected = true;
-    _connected_changed.call({true});
 }
 
 void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
@@ -221,10 +237,19 @@ void MQTTConnection::handle_data(esp_mqtt_event_handle_t event) {
     });
 }
 
-void MQTTConnection::subscribe(const std::string& topic) {
+int MQTTConnection::subscribe(const std::string& topic) {
     ESP_LOGI(TAG, "Subscribing to topic %s", topic.c_str());
 
-    ESP_ASSERT_CHECK(esp_mqtt_client_subscribe(_client, topic.c_str(), 0) >= 0);
+    const auto ret = esp_mqtt_client_subscribe(_client, topic.c_str(), 0);
+    ESP_ASSERT_CHECK(ret >= 0);
+
+    return ret;
+}
+
+void MQTTConnection::subscribe(const std::string& topic, std::function<void()> subscribed_func) {
+    const auto ret = subscribe(topic);
+
+    _subscribed_callbacks[ret] = subscribed_func;
 }
 
 void MQTTConnection::subscribe(const std::string& topic, std::function<void(const std::string&)> callback) {

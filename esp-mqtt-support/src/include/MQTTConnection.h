@@ -76,6 +76,7 @@ class MQTTConnection {
     Callback<void> _publish_discovery;
     std::map<std::string, std::function<void(const std::string&)>> _command_callbacks;
     std::map<std::string, std::function<void(const std::string&)>> _topic_callbacks;
+    std::map<int, std::function<void()>> _subscribed_callbacks;
     std::set<std::string> _published_discovery_topics;
     bool _connected{};
     int64_t _last_qos_publish_time{};
@@ -107,7 +108,8 @@ private:
     void event_handler(esp_event_base_t eventBase, int32_t eventId, void* eventData);
     void handle_connected();
     void handle_data(esp_mqtt_event_handle_t event);
-    void subscribe(const std::string& topic);
+    int subscribe(const std::string& topic);
+    void subscribe(const std::string& topic, std::function<void()> subscribed_func);
     void unsubscribe(const std::string& topic);
     void publish_configuration();
     void publish_json(cJSON* root, const std::string& topic, bool retain);
