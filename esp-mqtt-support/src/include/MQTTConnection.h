@@ -74,6 +74,7 @@ class MQTTConnection {
     esp_mqtt_client_handle_t _client{};
     Callback<MQTTConnectionState> _connected_changed;
     Callback<void> _publish_discovery;
+    Callback<cJSON*> _create_configuration;
     std::map<std::string, std::function<void(const std::string&)>> _command_callbacks;
     std::map<std::string, std::function<void(const std::string&)>> _topic_callbacks;
     std::map<int, std::function<void()>> _subscribed_callbacks;
@@ -93,6 +94,7 @@ public:
     void send_trigger(const char* name, const char* value);
     void on_connected_changed(std::function<void(MQTTConnectionState)> func) { _connected_changed.add(func); }
     void on_publish_discovery(std::function<void()> func) { _publish_discovery.add(func); }
+    void on_create_configuration(std::function<void(cJSON*)> func) { _create_configuration.add(func); }
     void subscribe(const std::string& topic, std::function<void(const std::string&)> callback);
     void register_callback(const char* object_id, std::function<void(const std::string&)> callback);
     void publish_button_discovery(MQTTDiscovery metadata, std::function<void()> command_func);

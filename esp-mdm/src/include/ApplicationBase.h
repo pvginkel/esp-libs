@@ -36,6 +36,7 @@ public:
     const std::string& get_authorization();
     Queue& get_queue() { return _queue; }
     MQTTConnection& get_mqtt_connection() { return _mqtt_connection; }
+    NetworkConnection& get_network_connection() { return _network_connection; }
     bool is_silent_startup() { return _silent_startup; }
 
     void on_begin(std::function<void()> func) { _begin.add(func); }

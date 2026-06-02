@@ -281,6 +281,8 @@ void MQTTConnection::publish_configuration() {
     cJSON_AddStringToObject(device, "name", _configuration.device_name.c_str());
     cJSON_AddStringToObject(device, "firmware_version", get_firmware_version().c_str());
 
+    _create_configuration.call(root);
+
     publish_json(root, _topic_prefix + "configuration", true);
 }
 
@@ -524,7 +526,7 @@ bool MQTTConnection::publish(const std::string& topic, const std::string& payloa
 
     auto result = publish_with_retry(topic.c_str(), payload.c_str(), payload.length(), qos, retain);
     if (result < 0) {
-        ESP_LOGD(TAG, "Publish to %s failed with error %d", topic.c_str(), result);
+        ESP_LOGD(TAG, "Publish tov%s failed with error %d", topic.c_str(), result);
         return false;
     }
 
