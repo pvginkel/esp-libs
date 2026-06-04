@@ -328,12 +328,12 @@ void MQTTConnection::publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitch
         cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
 
         register_callback(object_id, [command_func](auto data) {
-            if (data == "on") {
+            if (data == "on" || data == "true") {
                 command_func(true);
-            } else if (data == "off") {
+            } else if (data == "off" || data == "false") {
                 command_func(false);
             } else {
-                ESP_LOGW(TAG, "Cannot parse switch state '%s'", data);
+                ESP_LOGW(TAG, "Cannot parse switch state '%s' for object_id '%s'", data.c_str());
             }
         });
     });
