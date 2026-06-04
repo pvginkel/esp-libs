@@ -14,12 +14,19 @@ struct MQTTConnectionState {
     bool connected;
 };
 
+struct MQTTDeviceConfiguration {
+    std::string manufacturer;
+    std::string model;
+    std::string model_id;
+};
+
 struct MQTTConfiguration {
     std::string mqtt_endpoint;
     std::string mqtt_username;
     std::string mqtt_password;
     std::string device_name;
     std::string device_entity_id;
+    MQTTDeviceConfiguration device;
 };
 
 struct MQTTDiscovery {

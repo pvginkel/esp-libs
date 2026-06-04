@@ -12,4 +12,18 @@ menu "MDM Configuration"
         int "Core ID for log manager task"
         default 0
 
+    # Device identity used for Home Assistant MQTT discovery. Moved here from
+    # esp-mqtt-support so the MQTT layer stays transport-only; ApplicationBase
+    # feeds these into MQTTConfiguration::device by default, and concrete
+    # applications may override get_device_configuration() to vary them (e.g.
+    # per hardware version).
+    config MQTT_DEVICE_MANUFACTURER
+        string "MQTT device manufacturer"
+
+    config MQTT_DEVICE_MODEL
+        string "MQTT device model"
+
+    config MQTT_DEVICE_MODEL_ID
+        string "MQTT device model ID"
+
 endmenu

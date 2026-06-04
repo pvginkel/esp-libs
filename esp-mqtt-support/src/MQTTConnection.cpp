@@ -276,8 +276,8 @@ void MQTTConnection::publish_configuration() {
     cJSON_AddStringToObject(root, "unique_id", uniqueIdentifier.c_str());
 
     auto device = cJSON_AddObjectToObject(root, "device");
-    cJSON_AddStringToObject(device, "manufacturer", CONFIG_MQTT_DEVICE_MANUFACTURER);
-    cJSON_AddStringToObject(device, "model", CONFIG_MQTT_DEVICE_MODEL);
+    cJSON_AddStringToObject(device, "manufacturer", _configuration.device.manufacturer.c_str());
+    cJSON_AddStringToObject(device, "model", _configuration.device.model.c_str());
     cJSON_AddStringToObject(device, "name", _configuration.device_name.c_str());
     cJSON_AddStringToObject(device, "firmware_version", get_firmware_version().c_str());
 
@@ -451,9 +451,9 @@ void MQTTConnection::add_device_metadata(cJSON* root, const char* subdevice_id, 
     const auto identifiers = cJSON_AddArrayToObject(device, "identifiers");
     cJSON_AddItemToArray(identifiers, cJSON_CreateString(device_identifier.c_str()));
 
-    cJSON_AddStringToObject(device, "manufacturer", CONFIG_MQTT_DEVICE_MANUFACTURER);
-    cJSON_AddStringToObject(device, "model", CONFIG_MQTT_DEVICE_MODEL);
-    cJSON_AddStringToObject(device, "model_id", CONFIG_MQTT_DEVICE_MODEL_ID);
+    cJSON_AddStringToObject(device, "manufacturer", _configuration.device.manufacturer.c_str());
+    cJSON_AddStringToObject(device, "model", _configuration.device.model.c_str());
+    cJSON_AddStringToObject(device, "model_id", _configuration.device.model_id.c_str());
     if (subdevice_name) {
         cJSON_AddStringToObject(device, "name", subdevice_name);
     } else {

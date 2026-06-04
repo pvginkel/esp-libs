@@ -108,9 +108,18 @@ void ApplicationBase::begin_network_available() {
         .mqtt_password = "x",
         .device_name = _device_name,
         .device_entity_id = _device_entity_id,
+        .device = get_device_configuration(),
     });
 
     _mqtt_connection.begin();
+}
+
+MQTTDeviceConfiguration ApplicationBase::get_device_configuration() {
+    return {
+        .manufacturer = CONFIG_MQTT_DEVICE_MANUFACTURER,
+        .model = CONFIG_MQTT_DEVICE_MODEL,
+        .model_id = CONFIG_MQTT_DEVICE_MODEL_ID,
+    };
 }
 
 esp_err_t ApplicationBase::ensure_access_token() {

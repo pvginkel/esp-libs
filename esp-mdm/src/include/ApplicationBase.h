@@ -53,6 +53,8 @@ protected:
     virtual void do_configuration_loaded(cJSON* data) { _configuration_loaded.call(data); }
     virtual void do_process() { _process.call(); }
 
+    virtual MQTTDeviceConfiguration get_device_configuration();
+
 private:
     esp_err_t setup_flash();
     void begin_network();
