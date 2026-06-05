@@ -31,7 +31,7 @@ LOG_TAG(MQTTConnection);
 // degrades. printf goes straight to the console UART. Each line is prefixed with
 // a millisecond timestamp so intervals (pauses, the TTL) are readable. Flip the
 // switch to 0 to compile it out; the call sites can stay in place.
-#define ACK_DBG_LOG_ENABLED 1
+#define ACK_DBG_LOG_ENABLED 0
 
 #if ACK_DBG_LOG_ENABLED
 #define ACK_DBG_LOG(fmt, ...) \
@@ -516,7 +516,8 @@ bool MQTTConnection::handle_discovery_prune(const std::string& topic, bool empty
         // event task can no longer dispatch the disconnect that would free
         // everyone - a permanent deadlock. So enqueue non-blocking and drop on a
         // full queue; the config is still retained and is re-pruned next connect.
-        if (!_queue->try_enqueue([this, topic]() { publish_with_backpressure(topic.c_str(), "", 0, QOS_MIN_ONE, true); })) {
+        if (!_queue->try_enqueue(
+                [this, topic]() { publish_with_backpressure(topic.c_str(), "", 0, QOS_MIN_ONE, true); })) {
             ACK_DBG_LOG("prune dropped, queue full: %s", topic.c_str());
         }
     }
@@ -634,8 +635,7 @@ int MQTTConnection::publish_with_backpressure(const char* topic, const char* dat
                 // First time we couldn't get a slot for this publish: the budget
                 // is full. Record why and when so we can measure the stall.
                 pause_start = now;
-                ACK_DBG_LOG("pause: budget full (inflight=%d reserved=%d) topic=%s", dbg_inflight, dbg_reserved,
-                            topic);
+                ACK_DBG_LOG("pause: budget full (inflight=%d reserved=%d) topic=%s", dbg_inflight, dbg_reserved, topic);
             }
 
             _slot_available.wait(SLOT_WAIT);

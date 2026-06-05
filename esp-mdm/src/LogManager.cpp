@@ -38,9 +38,9 @@ int LogManager::log_handler(const char* message, va_list va) {
 
         if (result >= 0 && result < BUFFER_SIZE) {
             auto buffer_copy = strdup(_buffer);
-            ESP_ASSERT_CHECK(buffer_copy);
-
-            _instance->_messages.push_back(Message(buffer_copy));
+            if (buffer_copy) {
+                _instance->_messages.push_back(Message(buffer_copy));
+            }
         }
 
         return result;
