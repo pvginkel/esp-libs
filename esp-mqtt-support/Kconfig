@@ -15,5 +15,19 @@ menu "MQTT Configuration"
             applies back-pressure: a producer task blocks until an in-flight slot
             frees (an ACK arrives) or the connection drops.
 
+    config MQTT_INFLIGHT_TTL_MS
+        int "In-flight QoS message TTL (ms)"
+        default 5000
+        range 100 60000
+        help
+            Maximum time an in-flight QoS>0 publish is allowed to occupy a slot
+            without being acknowledged (MQTT_EVENT_PUBLISHED) or reported deleted
+            (MQTT_EVENT_DELETED). Once this elapses the slot is reclaimed anyway.
+            This is a self-healing backstop: esp-mqtt can silently drop a message
+            from its outbox without any event, which would otherwise leak the slot
+            permanently until the next disconnect. Keep it above the broker's
+            typical round-trip ACK latency but low enough that a lost message
+            doesn't stall publishing for long.
+
 
 endmenu

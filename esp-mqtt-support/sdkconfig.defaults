@@ -3,3 +3,7 @@
 CONFIG_MQTT_PROTOCOL_5=y
 CONFIG_MQTT_TASK_CORE_SELECTION_ENABLED=y
 CONFIG_MQTT_USE_CORE_0=y
+
+# Report outbox deletions (MQTT_EVENT_DELETED) so in-flight QoS slots are
+# reclaimed when esp-mqtt expires an unacknowledged message from its outbox.
+CONFIG_MQTT_REPORT_DELETED_MESSAGES=y

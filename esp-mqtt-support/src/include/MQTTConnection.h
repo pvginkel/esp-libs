@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <set>
 #include <string>
@@ -89,14 +90,21 @@ class MQTTConnection {
     std::map<int, std::function<void()>> _subscribed_callbacks;
     std::set<std::string> _published_discovery_topics;
     bool _connected{};
-    // Back-pressure for QoS>0 publishes. _in_flight counts unacknowledged QoS 1/2
-    // PUBLISH packets; producers block once it reaches CONFIG_MQTT_MAX_INFLIGHT_QOS
-    // and are released as the MQTT event task drains ACKs (or on disconnect).
-    // _transport_connected tracks the raw connection (CONNECTED..DISCONNECTED),
-    // unlike _connected which only flips true once the initial subscribe completes.
+    // Back-pressure for QoS>0 publishes. _inflight maps the msg_id of each
+    // unacknowledged QoS 1/2 PUBLISH to the timestamp (us) it was sent. Producers
+    // block once the number in flight plus _reserved reaches
+    // CONFIG_MQTT_MAX_INFLIGHT_QOS, and are released as the MQTT event task drains
+    // acknowledgements/deletions or on disconnect. _reserved counts slots claimed
+    // by producers that have not yet learned their msg_id (the window around the
+    // esp_mqtt_client_publish call). Entries older than CONFIG_MQTT_INFLIGHT_TTL_MS
+    // are reclaimed unconditionally, healing slots for messages esp-mqtt drops
+    // without ever reporting an event. _transport_connected tracks the raw
+    // connection (CONNECTED..DISCONNECTED), unlike _connected which only flips true
+    // once the initial subscribe completes.
     Mutex _inflight_mutex;
     Signal _slot_available;
-    int _in_flight{};
+    std::map<int, int64_t> _inflight;
+    int _reserved{};
     bool _transport_connected{};
 
 public:
@@ -137,7 +145,8 @@ private:
     bool handle_discovery_prune(const std::string& topic, bool empty_message);
     std::string get_firmware_version();
     int publish_with_backpressure(const char* topic, const char* data, int len, int qos, bool retain);
-    void reset_inflight(bool transport_connected);
-    void release_inflight_slot();
+    void set_transport_connected(bool connected);
+    void release_inflight_id(int msg_id);
+    int purge_expired_inflight(int64_t now);
     void add_device_metadata(cJSON* root, const char* subdevice_id, const char* subdevice_name);
 };
