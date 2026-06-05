@@ -4,6 +4,7 @@
 
 #include <charconv>
 
+#include "MQTTSupport.h"
 #include "defer.h"
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
@@ -328,12 +329,11 @@ void MQTTConnection::publish_switch_discovery(MQTTDiscovery metadata, MQTTSwitch
         cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
 
         register_callback(object_id, [command_func](auto data) {
-            if (data == "on" || data == "true") {
+            const auto state = parse_switch_state(data.c_str());
+            if (state == SwitchState::ON) {
                 command_func(true);
-            } else if (data == "off" || data == "false") {
+            } else if (state == SwitchState::OFF) {
                 command_func(false);
-            } else {
-                ESP_LOGW(TAG, "Cannot parse switch state '%s' for object_id '%s'", data.c_str());
             }
         });
     });
