@@ -9,7 +9,9 @@
 #include "esp_timer.h"
 
 Queue::Queue() {
-    _queue = xQueueCreate(32, sizeof(void*));
+    // 50 slots: headroom for bursts of event-task enqueues (e.g. a flood of
+    // discovery prunes) before producers feel back-pressure.
+    _queue = xQueueCreate(50, sizeof(void*));
 
     ESP_ASSERT_CHECK(_queue);
 }
@@ -18,6 +20,19 @@ void Queue::enqueue(const std::function<void()>& task, bool wait) {
     auto* copy = new std::function<void()>(task);
 
     ESP_ASSERT_CHECK(xQueueSend(_queue, &copy, wait ? portMAX_DELAY : 0));
+}
+
+bool Queue::try_enqueue(const std::function<void()>& task) {
+    auto* copy = new std::function<void()>(task);
+
+    // Never wait for room. Unlike enqueue(), a full queue is an expected outcome,
+    // not an assertion failure: free the copy and report the drop to the caller.
+    if (xQueueSend(_queue, &copy, 0) != pdTRUE) {
+        delete copy;
+        return false;
+    }
+
+    return true;
 }
 
 void Queue::enqueue_delayed(const std::function<void()>& task, uint32_t delay_ms) {
@@ -64,6 +79,11 @@ void Queue::handled_delayed_enqueues() {
 Queue::Queue() {}
 
 void Queue::enqueue(const std::function<void()>& task, bool wait) { _queue.push_back(task); }
+
+bool Queue::try_enqueue(const std::function<void()>& task) {
+    _queue.push_back(task);
+    return true;
+}
 
 void Queue::process() {
     while (!_queue.empty()) {

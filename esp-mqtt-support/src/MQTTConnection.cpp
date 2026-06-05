@@ -509,10 +509,16 @@ bool MQTTConnection::handle_discovery_prune(const std::string& topic, bool empty
 
     if (!empty_message && _published_discovery_topics.find(topic) == _published_discovery_topics.end()) {
         ESP_LOGI(TAG, "Pruning stale discovery topic %s", topic.c_str());
-        // This runs on the MQTT event task, which is the consumer that frees
-        // in-flight slots. Publishing here could block on back-pressure and
-        // deadlock the ACK draining, so hand the tombstone publish to the queue.
-        _queue->enqueue([this, topic]() { publish_with_backpressure(topic.c_str(), "", 0, QOS_MIN_ONE, true); });
+        // This runs on the MQTT event task - the consumer that drains ACKs and
+        // dispatches connect/disconnect. It must never block. Publishing here
+        // would block on back-pressure; even a blocking enqueue would wedge on a
+        // full queue while the queue task is itself back-pressured, and then the
+        // event task can no longer dispatch the disconnect that would free
+        // everyone - a permanent deadlock. So enqueue non-blocking and drop on a
+        // full queue; the config is still retained and is re-pruned next connect.
+        if (!_queue->try_enqueue([this, topic]() { publish_with_backpressure(topic.c_str(), "", 0, QOS_MIN_ONE, true); })) {
+            ACK_DBG_LOG("prune dropped, queue full: %s", topic.c_str());
+        }
     }
 
     return true;
