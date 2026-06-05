@@ -3,5 +3,17 @@ menu "MQTT Configuration"
     config MQTT_TOPIC_PREFIX
         string "MQTT topic prefix"
 
+    config MQTT_MAX_INFLIGHT_QOS
+        int "Maximum in-flight QoS>0 messages"
+        default 16
+        range 1 100
+        help
+            Upper bound on the number of unacknowledged QoS 1/2 PUBLISH packets
+            allowed in flight at once. Must stay below the broker's MQTT5 Receive
+            Maximum (commonly 20) or the broker rejects publishes with "Client send
+            more than N QoS1 and QoS2 PUBLISH packet without no ack". Publishing
+            applies back-pressure: a producer task blocks until an in-flight slot
+            frees (an ACK arrives) or the connection drops.
+
 
 endmenu

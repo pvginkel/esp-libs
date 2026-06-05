@@ -5,7 +5,9 @@
 #include <string>
 
 #include "Callback.h"
+#include "Mutex.h"
 #include "Queue.h"
+#include "Signal.h"
 #include "Span.h"
 #include "cJSON.h"
 #include "mqtt_client.h"
@@ -87,7 +89,15 @@ class MQTTConnection {
     std::map<int, std::function<void()>> _subscribed_callbacks;
     std::set<std::string> _published_discovery_topics;
     bool _connected{};
-    int64_t _last_qos_publish_time{};
+    // Back-pressure for QoS>0 publishes. _in_flight counts unacknowledged QoS 1/2
+    // PUBLISH packets; producers block once it reaches CONFIG_MQTT_MAX_INFLIGHT_QOS
+    // and are released as the MQTT event task drains ACKs (or on disconnect).
+    // _transport_connected tracks the raw connection (CONNECTED..DISCONNECTED),
+    // unlike _connected which only flips true once the initial subscribe completes.
+    Mutex _inflight_mutex;
+    Signal _slot_available;
+    int _in_flight{};
+    bool _transport_connected{};
 
 public:
     MQTTConnection(Queue* queue);
@@ -126,6 +136,8 @@ private:
                            std::function<void(cJSON* json, const char* object_id)> func);
     bool handle_discovery_prune(const std::string& topic, bool empty_message);
     std::string get_firmware_version();
-    int publish_with_retry(const char* topic, const char* data, int len, int qos, bool retain);
+    int publish_with_backpressure(const char* topic, const char* data, int len, int qos, bool retain);
+    void reset_inflight(bool transport_connected);
+    void release_inflight_slot();
     void add_device_metadata(cJSON* root, const char* subdevice_id, const char* subdevice_name);
 };

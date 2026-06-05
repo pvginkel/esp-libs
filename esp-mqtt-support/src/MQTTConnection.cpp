@@ -8,7 +8,6 @@
 #include "defer.h"
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
-#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -109,6 +108,9 @@ void MQTTConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, 
     switch ((esp_mqtt_event_id_t)eventId) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT connected");
+            // The transport is up: allow QoS>0 publishes through back-pressure and
+            // start from an empty in-flight budget for the new connection.
+            reset_inflight(true);
             // On connect we're publishing a large number of messages for metadata.
             // We need to do this outside of the MQTT loop because otherwise we
             // wouldn't be able to process in flight ACKs.
@@ -119,6 +121,9 @@ void MQTTConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, 
             ESP_LOGI(TAG, "MQTT disconnected");
 
             _connected = false;
+            // Release any producers blocked on the in-flight budget; the ACKs they
+            // were waiting for will never arrive on this connection.
+            reset_inflight(false);
             _connected_changed.queue(_queue, {false});
             break;
 
@@ -147,6 +152,10 @@ void MQTTConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, 
             break;
 
         case MQTT_EVENT_PUBLISHED:
+            // A QoS>0 publish was acknowledged (PUBACK/PUBCOMP). Free its in-flight
+            // slot and wake a waiting producer. This is the consumer side of the
+            // back-pressure; it only signals and never blocks.
+            release_inflight_slot();
             break;
 
         case MQTT_EVENT_DATA:
@@ -290,7 +299,7 @@ void MQTTConnection::publish_configuration() {
 void MQTTConnection::publish_json(cJSON* root, const std::string& topic, bool retain) {
     auto json = cJSON_PrintUnformatted(root);
 
-    publish_with_retry(topic.c_str(), json, 0, QOS_MIN_ONE, retain);
+    publish_with_backpressure(topic.c_str(), json, 0, QOS_MIN_ONE, retain);
 
     cJSON_free(json);
 }
@@ -473,7 +482,10 @@ bool MQTTConnection::handle_discovery_prune(const std::string& topic, bool empty
 
     if (!empty_message && _published_discovery_topics.find(topic) == _published_discovery_topics.end()) {
         ESP_LOGI(TAG, "Pruning stale discovery topic %s", topic.c_str());
-        publish_with_retry(topic.c_str(), "", 0, QOS_MIN_ONE, true);
+        // This runs on the MQTT event task, which is the consumer that frees
+        // in-flight slots. Publishing here could block on back-pressure and
+        // deadlock the ACK draining, so hand the tombstone publish to the queue.
+        _queue->enqueue([this, topic]() { publish_with_backpressure(topic.c_str(), "", 0, QOS_MIN_ONE, true); });
     }
 
     return true;
@@ -504,7 +516,7 @@ void MQTTConnection::send_state(cJSON* data) {
     auto json = cJSON_PrintUnformatted(data);
 
     auto topic = _topic_prefix + "state";
-    publish_with_retry(topic.c_str(), json, 0, QOS_MIN_ONE, true);
+    publish_with_backpressure(topic.c_str(), json, 0, QOS_MIN_ONE, true);
 
     cJSON_free(json);
 }
@@ -515,7 +527,7 @@ void MQTTConnection::send_trigger(const char* name, const char* value) {
     ESP_ASSERT_CHECK(_client);
 
     auto topic = _topic_prefix + name;
-    publish_with_retry(topic.c_str(), value, 0, QOS_MIN_ONE, false);
+    publish_with_backpressure(topic.c_str(), value, 0, QOS_MIN_ONE, false);
 }
 
 bool MQTTConnection::publish(const std::string& topic, const std::string& payload, int qos, bool retain) {
@@ -524,7 +536,7 @@ bool MQTTConnection::publish(const std::string& topic, const std::string& payloa
         return false;
     }
 
-    auto result = publish_with_retry(topic.c_str(), payload.c_str(), payload.length(), qos, retain);
+    auto result = publish_with_backpressure(topic.c_str(), payload.c_str(), payload.length(), qos, retain);
     if (result < 0) {
         ESP_LOGD(TAG, "Publish tov%s failed with error %d", topic.c_str(), result);
         return false;
@@ -533,32 +545,80 @@ bool MQTTConnection::publish(const std::string& topic, const std::string& payloa
     return true;
 }
 
-int MQTTConnection::publish_with_retry(const char* topic, const char* data, int len, int qos, bool retain) {
-    constexpr int64_t MIN_QOS_INTERVAL_US = 20000;  // 20ms between QoS > 0 messages
-    constexpr int MAX_RETRIES = 5;
-    constexpr int RETRY_DELAY_MS = 200;
-
+int MQTTConnection::publish_with_backpressure(const char* topic, const char* data, int len, int qos, bool retain) {
+    // Back-pressure for QoS>0: keep the number of unacknowledged in-flight
+    // publishes below the broker's MQTT5 Receive Maximum. This blocks the calling
+    // (producer) task until a slot frees; the MQTT event task is the consumer
+    // (MQTT_EVENT_PUBLISHED frees slots), so it must never reach this path - that
+    // would deadlock the very task that drains ACKs. QoS 0 is fire-and-forget and
+    // does not count against the budget.
     if (qos > 0) {
-        auto now = esp_timer_get_time();
-        auto elapsed = now - _last_qos_publish_time;
-        if (elapsed < MIN_QOS_INTERVAL_US) {
-            vTaskDelay(pdMS_TO_TICKS((MIN_QOS_INTERVAL_US - elapsed) / 1000));
+        // Re-check period so a half-open connection (no DISCONNECTED yet) cannot
+        // pin a producer indefinitely; it also bounds the disconnect wake-up.
+        constexpr TickType_t SLOT_WAIT = pdMS_TO_TICKS(250);
+
+        for (;;) {
+            bool acquired = false;
+            bool connected;
+            {
+                auto lock = _inflight_mutex.take();
+                connected = _transport_connected;
+                if (connected && _in_flight < CONFIG_MQTT_MAX_INFLIGHT_QOS) {
+                    _in_flight++;
+                    acquired = true;
+                }
+            }
+
+            if (!connected) {
+                // Don't queue into the outbox while offline; drop and let the
+                // caller re-publish on reconnect. Chain-wake any other producers
+                // blocked here so a disconnect releases them all promptly.
+                _slot_available.signal();
+                ESP_LOGD(TAG, "Publish to %s dropped, transport disconnected", topic);
+                return -1;
+            }
+
+            if (acquired) {
+                break;
+            }
+
+            _slot_available.wait(SLOT_WAIT);
         }
-        _last_qos_publish_time = esp_timer_get_time();
     }
 
-    for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        auto result = esp_mqtt_client_publish(_client, topic, data, len, qos, retain);
-        if (result >= 0) {
-            return result;
+    auto result = esp_mqtt_client_publish(_client, topic, data, len, qos, retain);
+    if (result < 0) {
+        // Failed to hand off to esp-mqtt (e.g. outbox out of memory); give the
+        // reserved slot back so it isn't leaked.
+        if (qos > 0) {
+            release_inflight_slot();
         }
-
-        if (attempt < MAX_RETRIES - 1) {
-            ESP_LOGD(TAG, "Publish failed (attempt %d/%d), retrying in %dms", attempt + 1, MAX_RETRIES, RETRY_DELAY_MS);
-            vTaskDelay(pdMS_TO_TICKS(RETRY_DELAY_MS));
-        }
+        ESP_LOGW(TAG, "Publish to %s failed with error %d", topic, result);
     }
 
-    ESP_LOGW(TAG, "Publish to %s failed after %d attempts", topic, MAX_RETRIES);
-    return -1;
+    return result;
+}
+
+void MQTTConnection::reset_inflight(bool transport_connected) {
+    {
+        auto lock = _inflight_mutex.take();
+        _transport_connected = transport_connected;
+        _in_flight = 0;
+    }
+    // Wake every producer: on connect so they can resume, on disconnect so they
+    // observe _transport_connected == false and fail fast instead of blocking on
+    // ACKs that will never arrive.
+    _slot_available.signal();
+}
+
+void MQTTConnection::release_inflight_slot() {
+    {
+        auto lock = _inflight_mutex.take();
+        // Guard against underflow: after a reconnect esp-mqtt may resend outbox
+        // messages whose PUBLISHED events arrive after we reset the counter.
+        if (_in_flight > 0) {
+            _in_flight--;
+        }
+    }
+    _slot_available.signal();
 }
