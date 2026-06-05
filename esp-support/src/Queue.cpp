@@ -9,8 +9,6 @@
 #include "esp_timer.h"
 
 Queue::Queue() {
-    // 50 slots: headroom for bursts of event-task enqueues (e.g. a flood of
-    // discovery prunes) before producers feel back-pressure.
     _queue = xQueueCreate(50, sizeof(void*));
 
     ESP_ASSERT_CHECK(_queue);
@@ -25,8 +23,6 @@ void Queue::enqueue(const std::function<void()>& task, bool wait) {
 bool Queue::try_enqueue(const std::function<void()>& task) {
     auto* copy = new std::function<void()>(task);
 
-    // Never wait for room. Unlike enqueue(), a full queue is an expected outcome,
-    // not an assertion failure: free the copy and report the drop to the caller.
     if (xQueueSend(_queue, &copy, 0) != pdTRUE) {
         delete copy;
         return false;

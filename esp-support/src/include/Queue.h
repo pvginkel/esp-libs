@@ -24,10 +24,6 @@ public:
     Queue();
 
     void enqueue(const std::function<void()>& task, bool wait = true);
-    // Non-blocking enqueue: returns false (and drops the task) if the queue is
-    // full, instead of blocking. For callers that must never block - such as the
-    // MQTT event task, which also has to keep draining ACKs and dispatching
-    // connect/disconnect events.
     [[nodiscard]] bool try_enqueue(const std::function<void()>& task);
 #ifndef LV_SIMULATOR
     void enqueue_delayed(const std::function<void()>& task, uint32_t delay_ms);
