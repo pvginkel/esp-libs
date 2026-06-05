@@ -563,41 +563,28 @@ int MQTTConnection::publish_with_backpressure(const char* topic, const char* dat
     // acknowledgements. QoS 0 is fire-and-forget and does not count against the
     // budget.
     if (qos > 0) {
-        // Re-check period so a half-open connection (no DISCONNECTED yet) cannot
-        // pin a producer indefinitely; it also bounds the disconnect wake-up.
-        constexpr TickType_t MAX_SLOT_WAIT = pdMS_TO_TICKS(250);
+        // While the budget is full, re-check on a fixed interval. A freed slot
+        // signals us immediately (see release_inflight_id), so this interval only
+        // bounds the worst case: a producer blocking until a stuck message is
+        // reclaimed by its TTL, for which there is no event to wake us. That is a
+        // degraded path we should never hit, so a coarse poll is fine.
+        constexpr TickType_t SLOT_WAIT = pdMS_TO_TICKS(250);
 
         for (;;) {
             const auto now = esp_timer_get_time();
             bool connected;
             bool admitted = false;
-            int purged;
-            int64_t soonest_deadline = INT64_MAX;
             {
                 auto lock = _inflight_mutex.take();
                 connected = _transport_connected;
-                purged = purge_expired_inflight_unsafe(now);
+                purge_expired_inflight_unsafe(now);
                 if (connected && (int)_inflight.size() + _reserved < CONFIG_MQTT_MAX_INFLIGHT_QOS) {
                     // Reserve the slot now; the msg_id is only known once
                     // esp_mqtt_client_publish returns, so we cannot insert the
                     // map entry yet without holding the lock across the publish.
                     _reserved++;
                     admitted = true;
-                } else {
-                    // Find when the oldest in-flight message will time out so we
-                    // can wake to reclaim it even if no event ever arrives.
-                    for (const auto& entry : _inflight) {
-                        const int64_t deadline = entry.second + (int64_t)CONFIG_MQTT_INFLIGHT_TTL_MS * 1000;
-                        if (deadline < soonest_deadline) {
-                            soonest_deadline = deadline;
-                        }
-                    }
                 }
-            }
-
-            if (purged > 0) {
-                // A TTL expiry opened slots; wake another waiter to claim them.
-                _slot_available.signal();
             }
 
             if (!connected) {
@@ -613,23 +600,7 @@ int MQTTConnection::publish_with_backpressure(const char* topic, const char* dat
                 break;
             }
 
-            TickType_t wait_ticks = MAX_SLOT_WAIT;
-            if (soonest_deadline != INT64_MAX) {
-                const int64_t remaining_us = soonest_deadline - esp_timer_get_time();
-                if (remaining_us <= 0) {
-                    // Already due; loop to purge it immediately.
-                    continue;
-                }
-                TickType_t ttl_ticks = pdMS_TO_TICKS(remaining_us / 1000);
-                if (ttl_ticks < 1) {
-                    ttl_ticks = 1;
-                }
-                if (ttl_ticks < wait_ticks) {
-                    wait_ticks = ttl_ticks;
-                }
-            }
-
-            _slot_available.wait(wait_ticks);
+            _slot_available.wait(SLOT_WAIT);
         }
     }
 
@@ -684,20 +655,17 @@ void MQTTConnection::release_inflight_id(int msg_id) {
     _slot_available.signal();
 }
 
-int MQTTConnection::purge_expired_inflight_unsafe(int64_t now) {
+void MQTTConnection::purge_expired_inflight_unsafe(int64_t now) {
     // Caller must hold _inflight_mutex. Reclaim slots for messages that have been
     // in flight longer than the TTL - esp-mqtt can drop a message from its outbox
     // without ever posting an event, which would otherwise leak the slot until the
     // next disconnect.
     const int64_t ttl_us = (int64_t)CONFIG_MQTT_INFLIGHT_TTL_MS * 1000;
-    int purged = 0;
     for (auto it = _inflight.begin(); it != _inflight.end();) {
         if (now - it->second > ttl_us) {
             it = _inflight.erase(it);
-            purged++;
         } else {
             ++it;
         }
     }
-    return purged;
 }

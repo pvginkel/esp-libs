@@ -147,6 +147,6 @@ private:
     int publish_with_backpressure(const char* topic, const char* data, int len, int qos, bool retain);
     void set_transport_connected(bool connected);
     void release_inflight_id(int msg_id);
-    int purge_expired_inflight_unsafe(int64_t now);
+    void purge_expired_inflight_unsafe(int64_t now);
     void add_device_metadata(cJSON* root, const char* subdevice_id, const char* subdevice_name);
 };
