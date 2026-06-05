@@ -54,6 +54,7 @@ protected:
     virtual void do_process() { _process.call(); }
 
     virtual MQTTDeviceConfiguration get_device_configuration();
+    virtual int8_t get_wifi_max_tx_power();
 
 private:
     esp_err_t setup_flash();

@@ -20,7 +20,7 @@ NetworkConnection::NetworkConnection(Queue* synchronizationQueue) : _synchroniza
     _instance = this;
 }
 
-esp_err_t NetworkConnection::begin(const char* ssid, const char* password) {
+esp_err_t NetworkConnection::begin(const char* ssid, const char* password, int8_t max_tx_power) {
     // Event group is application-lifetime; no cleanup needed.
     _wifi_event_group = xEventGroupCreate();
 
@@ -75,15 +75,13 @@ esp_err_t NetworkConnection::begin(const char* ssid, const char* password) {
     ESP_ERROR_RETURN(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig));
     ESP_ERROR_RETURN(esp_wifi_start());
 
-    if (CONFIG_NETWORK_WIFI_MAX_TX_POWER) {
+    if (max_tx_power) {
         int8_t power;
         ESP_ERROR_RETURN(esp_wifi_get_max_tx_power(&power));
 
-        const int8_t new_power = (int8_t)CONFIG_NETWORK_WIFI_MAX_TX_POWER;
+        ESP_LOGI(TAG, "WiFi power set to %" PRIi8 " changing to %" PRIi8, power, max_tx_power);
 
-        ESP_LOGI(TAG, "WiFi power set to %" PRIi8 " changing to %" PRIi8, power, new_power);
-
-        ESP_ERROR_RETURN(esp_wifi_set_max_tx_power(new_power));
+        ESP_ERROR_RETURN(esp_wifi_set_max_tx_power(max_tx_power));
     }
 
     ESP_LOGI(TAG, "Finished setting up WiFi");

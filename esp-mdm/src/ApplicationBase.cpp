@@ -69,7 +69,7 @@ void ApplicationBase::begin_network() {
     });
 
     ESP_ERROR_CHECK(_network_connection.begin(_mdm_configuration.get_wifi_ssid().c_str(),
-                                              _mdm_configuration.get_wifi_password().c_str()));
+                                              _mdm_configuration.get_wifi_password().c_str(), get_wifi_max_tx_power()));
 }
 
 void ApplicationBase::begin_network_available() {
@@ -121,6 +121,8 @@ MQTTDeviceConfiguration ApplicationBase::get_device_configuration() {
         .model_id = CONFIG_MQTT_DEVICE_MODEL_ID,
     };
 }
+
+int8_t ApplicationBase::get_wifi_max_tx_power() { return CONFIG_NETWORK_WIFI_MAX_TX_POWER; }
 
 esp_err_t ApplicationBase::ensure_access_token() {
     // Check if we have a valid token (with 30 second buffer).

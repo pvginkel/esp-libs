@@ -29,7 +29,7 @@ class NetworkConnection {
 public:
     NetworkConnection(Queue* synchronizationQueue);
 
-    esp_err_t begin(const char* ssid, const char* password);
+    esp_err_t begin(const char* ssid, const char* password, int8_t max_tx_power);
     void on_state_changed(std::function<void(NetworkConnectionState)> func) { _state_changed.add(func); }
     std::string get_ip_address();
 
