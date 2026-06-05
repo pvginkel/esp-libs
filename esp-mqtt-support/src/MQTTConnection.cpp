@@ -4,6 +4,7 @@
 
 #include <charconv>
 #include <cstdint>
+#include <cstdio>
 
 #include "MQTTSupport.h"
 #include "defer.h"
@@ -22,6 +23,22 @@ LOG_TAG(MQTTConnection);
 #define QOS_EXACTLY_ONE 2  // Send exactly one.
 
 #define MAXIMUM_PACKET_SIZE 4096
+
+// Debug instrumentation for the QoS in-flight back-pressure. Deliberately uses
+// printf rather than ESP_LOGx: the log path is routed through MQTT (see
+// LogManager), so logging the back-pressure over it would generate the very QoS
+// traffic we are trying to observe - and would go silent exactly when the link
+// degrades. printf goes straight to the console UART. Each line is prefixed with
+// a millisecond timestamp so intervals (pauses, the TTL) are readable. Flip the
+// switch to 0 to compile it out; the call sites can stay in place.
+#define ACK_DBG_LOG_ENABLED 1
+
+#if ACK_DBG_LOG_ENABLED
+#define ACK_DBG_LOG(fmt, ...) \
+    printf("[ACK_DBG %8lld] " fmt "\n", (long long)(esp_timer_get_time() / 1000), ##__VA_ARGS__)
+#else
+#define ACK_DBG_LOG(fmt, ...) ((void)0)
+#endif
 
 MQTTConnection::MQTTConnection(Queue* queue) : _queue(queue), _device_id(get_device_id()) {}
 
@@ -163,6 +180,7 @@ void MQTTConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, 
             // esp-mqtt expired this message from its outbox before it could be
             // acknowledged (requires CONFIG_MQTT_REPORT_DELETED_MESSAGES). Free its
             // slot so an undeliverable message doesn't hold back-pressure forever.
+            ACK_DBG_LOG("outbox delete: msg_id=%d", event->msg_id);
             ESP_LOGD(TAG, "MQTT message %d deleted from outbox", event->msg_id);
             release_inflight_id(event->msg_id);
             break;
@@ -569,15 +587,20 @@ int MQTTConnection::publish_with_backpressure(const char* topic, const char* dat
         // reclaimed by its TTL, for which there is no event to wake us. That is a
         // degraded path we should never hit, so a coarse poll is fine.
         constexpr TickType_t SLOT_WAIT = pdMS_TO_TICKS(250);
+        int64_t pause_start = 0;
 
         for (;;) {
             const auto now = esp_timer_get_time();
             bool connected;
             bool admitted = false;
+            [[maybe_unused]] int dbg_inflight = 0;
+            [[maybe_unused]] int dbg_reserved = 0;
             {
                 auto lock = _inflight_mutex.take();
                 connected = _transport_connected;
                 purge_expired_inflight_unsafe(now);
+                dbg_inflight = (int)_inflight.size();
+                dbg_reserved = _reserved;
                 if (connected && (int)_inflight.size() + _reserved < CONFIG_MQTT_MAX_INFLIGHT_QOS) {
                     // Reserve the slot now; the msg_id is only known once
                     // esp_mqtt_client_publish returns, so we cannot insert the
@@ -592,6 +615,7 @@ int MQTTConnection::publish_with_backpressure(const char* topic, const char* dat
                 // caller re-publish on reconnect. Chain-wake any other producers
                 // blocked here so a disconnect releases them all promptly.
                 _slot_available.signal();
+                ACK_DBG_LOG("drop: transport down, topic=%s", topic);
                 ESP_LOGD(TAG, "Publish to %s dropped, transport disconnected", topic);
                 return -1;
             }
@@ -600,7 +624,20 @@ int MQTTConnection::publish_with_backpressure(const char* topic, const char* dat
                 break;
             }
 
+            if (pause_start == 0) {
+                // First time we couldn't get a slot for this publish: the budget
+                // is full. Record why and when so we can measure the stall.
+                pause_start = now;
+                ACK_DBG_LOG("pause: budget full (inflight=%d reserved=%d) topic=%s", dbg_inflight, dbg_reserved,
+                            topic);
+            }
+
             _slot_available.wait(SLOT_WAIT);
+        }
+
+        if (pause_start != 0) {
+            ACK_DBG_LOG("resume: waited %lldms topic=%s", (long long)((esp_timer_get_time() - pause_start) / 1000),
+                        topic);
         }
     }
 
@@ -626,6 +663,7 @@ int MQTTConnection::publish_with_backpressure(const char* topic, const char* dat
     }
 
     if (result < 0) {
+        ACK_DBG_LOG("publish error: rc=%d topic=%s", result, topic);
         ESP_LOGW(TAG, "Publish to %s failed with error %d", topic, result);
     }
 
@@ -637,6 +675,7 @@ void MQTTConnection::set_transport_connected(bool connected) {
         auto lock = _inflight_mutex.take();
         _transport_connected = connected;
     }
+    ACK_DBG_LOG("transport %s", connected ? "connected" : "disconnected");
     // Wake every producer: on connect so they can resume, on disconnect so they
     // observe the transport is down and fail fast instead of blocking on
     // acknowledgements that will never arrive. In-flight entries are intentionally
@@ -663,6 +702,7 @@ void MQTTConnection::purge_expired_inflight_unsafe(int64_t now) {
     const int64_t ttl_us = (int64_t)CONFIG_MQTT_INFLIGHT_TTL_MS * 1000;
     for (auto it = _inflight.begin(); it != _inflight.end();) {
         if (now - it->second > ttl_us) {
+            ACK_DBG_LOG("ttl reclaim: msg_id=%d age=%lldms", it->first, (long long)((now - it->second) / 1000));
             it = _inflight.erase(it);
         } else {
             ++it;
