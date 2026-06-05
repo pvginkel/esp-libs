@@ -576,7 +576,7 @@ int MQTTConnection::publish_with_backpressure(const char* topic, const char* dat
             {
                 auto lock = _inflight_mutex.take();
                 connected = _transport_connected;
-                purged = purge_expired_inflight(now);
+                purged = purge_expired_inflight_unsafe(now);
                 if (connected && (int)_inflight.size() + _reserved < CONFIG_MQTT_MAX_INFLIGHT_QOS) {
                     // Reserve the slot now; the msg_id is only known once
                     // esp_mqtt_client_publish returns, so we cannot insert the
@@ -684,7 +684,7 @@ void MQTTConnection::release_inflight_id(int msg_id) {
     _slot_available.signal();
 }
 
-int MQTTConnection::purge_expired_inflight(int64_t now) {
+int MQTTConnection::purge_expired_inflight_unsafe(int64_t now) {
     // Caller must hold _inflight_mutex. Reclaim slots for messages that have been
     // in flight longer than the TTL - esp-mqtt can drop a message from its outbox
     // without ever posting an event, which would otherwise leak the slot until the
