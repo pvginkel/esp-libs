@@ -50,6 +50,15 @@ esp_err_t NetworkConnection::begin(const char* ssid, const char* password, int8_
     wifi_config_t wifiConfig = {
         .sta =
             {
+                // Scan every channel and connect to the AP with the strongest
+                // signal. The default (WIFI_FAST_SCAN) connects to the first AP
+                // matching the SSID, which on a network with several APs sharing
+                // one SSID can latch onto a weak/distant AP; the ESP32 station
+                // then never roams away on its own for the life of the
+                // connection.
+                .scan_method = WIFI_ALL_CHANNEL_SCAN,
+                .sort_method = WIFI_CONNECT_AP_BY_SIGNAL,
+
                 // Authmode threshold resets to WPA2 as default if password
                 // matches WPA2 standards (pasword len => 8). If you want to
                 // connect the device to deprecated WEP/WPA networks, Please set
