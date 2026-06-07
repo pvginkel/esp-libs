@@ -3,6 +3,7 @@
 #include "NetworkConnection.h"
 
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_netif_sntp.h"
 #include "esp_wifi.h"
 #include "sdkconfig.h"
@@ -134,7 +135,10 @@ void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventI
         // If we get a disconnect after this point, we won't attempt to reconnect.
         _have_connected = true;
 
-        ESP_LOGI(TAG, "Got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        uint8_t mac[6];
+        ESP_ERROR_CHECK(esp_wifi_get_mac(WIFI_IF_STA, mac));
+
+        ESP_LOGI(TAG, "Got ip:" IPSTR ", mac:" MACSTR, IP2STR(&event->ip_info.ip), MAC2STR(mac));
 
         setup_sntp();
     }
