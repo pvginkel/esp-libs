@@ -110,6 +110,29 @@ std::string NetworkConnection::get_ip_address() {
     return {};
 }
 
+WiFiInfo NetworkConnection::get_wifi_info() {
+    wifi_ap_record_t ap_info;
+    if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
+        // Not associated (e.g. between connections). RSSI/SSID/BSSID are undefined.
+        return {};
+    }
+
+    return WiFiInfo{
+        .associated = true,
+        .rssi = ap_info.rssi,
+        .ssid = std::string(reinterpret_cast<const char*>(ap_info.ssid)),
+        .bssid = strformat("%02X:%02X:%02X:%02X:%02X:%02X", ap_info.bssid[0], ap_info.bssid[1], ap_info.bssid[2],
+                           ap_info.bssid[3], ap_info.bssid[4], ap_info.bssid[5]),
+    };
+}
+
+std::string NetworkConnection::get_mac_address() {
+    uint8_t mac[6];
+    ESP_ERROR_CHECK(esp_read_mac(mac, ESP_MAC_WIFI_STA));
+
+    return strformat("%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 void NetworkConnection::event_handler(esp_event_base_t eventBase, int32_t eventId, void* eventData) {
     if (eventBase == WIFI_EVENT && eventId == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "Connecting to AP, attempt %d", _attempt + 1);

@@ -47,6 +47,12 @@ struct MQTTSensorDiscovery {
     const char* state_class;
     const char* unit_of_measurement;
     const char* value_template;
+    // Overrides the state topic the entity reads from. Null uses the shared
+    // device state topic (<prefix>/state).
+    const char* state_topic = nullptr;
+    // Forwarded to Home Assistant's suggested_display_precision. Negative omits
+    // it (HA then uses its default).
+    int suggested_display_precision = -1;
 };
 
 struct MQTTSwitchDiscovery {
@@ -113,6 +119,10 @@ public:
     void set_configuration(MQTTConfiguration configuration) { _configuration = configuration; }
     void begin();
     bool is_connected() { return _connected; }
+    // Builds a fully-qualified topic under this device's prefix, e.g.
+    // get_device_topic("diagnostics") -> "<prefix>/<device_id>/diagnostics".
+    // Valid only after begin() has run (the prefix is set there).
+    std::string get_device_topic(const std::string& suffix) const { return _topic_prefix + suffix; }
     bool publish(const std::string& topic, const std::string& payload, int qos = 1, bool retain = false);
     void send_state();
     void send_state(cJSON* data);

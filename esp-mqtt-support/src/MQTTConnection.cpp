@@ -348,10 +348,25 @@ void MQTTConnection::publish_button_discovery(MQTTDiscovery metadata, std::funct
 
 void MQTTConnection::publish_sensor_discovery(MQTTDiscovery metadata, MQTTSensorDiscovery component_metadata) {
     publish_discovery("sensor", metadata, [this, component_metadata](auto json, auto object_id) {
-        cJSON_AddStringToObject(json, "state_class", component_metadata.state_class);
-        cJSON_AddStringToObject(json, "state_topic", (_topic_prefix + "state").c_str());
-        cJSON_AddStringToObject(json, "unit_of_measurement", component_metadata.unit_of_measurement);
-        cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
+        // Only emit the keys that are set. A null rendered through cJSON becomes
+        // an empty string (""), which Home Assistant rejects - text sensors must
+        // omit state_class/unit entirely rather than send "".
+        if (component_metadata.state_class) {
+            cJSON_AddStringToObject(json, "state_class", component_metadata.state_class);
+        }
+        const auto state_topic =
+            component_metadata.state_topic ? std::string(component_metadata.state_topic) : _topic_prefix + "state";
+        cJSON_AddStringToObject(json, "state_topic", state_topic.c_str());
+        if (component_metadata.unit_of_measurement) {
+            cJSON_AddStringToObject(json, "unit_of_measurement", component_metadata.unit_of_measurement);
+        }
+        if (component_metadata.value_template) {
+            cJSON_AddStringToObject(json, "value_template", component_metadata.value_template);
+        }
+        if (component_metadata.suggested_display_precision >= 0) {
+            cJSON_AddNumberToObject(json, "suggested_display_precision",
+                                    component_metadata.suggested_display_precision);
+        }
     });
 }
 
@@ -435,7 +450,9 @@ void MQTTConnection::publish_discovery(const char* component, const MQTTDiscover
     DEFER(cJSON_Delete(root));
 
     cJSON_AddStringToObject(root, "name", metadata.name);
-    cJSON_AddStringToObject(root, "icon", metadata.icon);
+    if (metadata.icon) {
+        cJSON_AddStringToObject(root, "icon", metadata.icon);
+    }
     if (metadata.entity_category) {
         cJSON_AddStringToObject(root, "entity_category", metadata.entity_category);
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Callback.h"
+#include "DeviceDiagnostics.h"
 #include "LogManager.h"
 #include "MDMConfiguration.h"
 #include "MQTTConnection.h"
@@ -13,6 +14,7 @@ class ApplicationBase {
     Queue _queue;
     LogManager _log_manager;
     MDMConfiguration _mdm_configuration;
+    DeviceDiagnostics _device_diagnostics;
     Callback<void> _begin;
     Callback<void> _network_available;
     Callback<void> _network_connection_failed;

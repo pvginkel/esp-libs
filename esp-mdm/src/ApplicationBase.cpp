@@ -22,7 +22,10 @@ LOG_TAG(ApplicationBase);
 bool _shutdown_initiated{};
 
 ApplicationBase::ApplicationBase()
-    : _network_connection(&_queue), _mqtt_connection(&_queue), _log_manager(_mqtt_connection) {}
+    : _network_connection(&_queue),
+      _mqtt_connection(&_queue),
+      _log_manager(_mqtt_connection),
+      _device_diagnostics(_network_connection, _mqtt_connection, _queue) {}
 
 void ApplicationBase::begin() {
     const auto reset_reason = esp_reset_reason();
@@ -110,6 +113,10 @@ void ApplicationBase::begin_network_available() {
         .device_entity_id = _device_entity_id,
         .device = get_device_configuration(),
     });
+
+    // Wire up the shared WiFi / connection diagnostic entities before MQTT
+    // connects so their discovery is registered for the first handle_connected.
+    _device_diagnostics.begin();
 
     _mqtt_connection.begin();
 }
