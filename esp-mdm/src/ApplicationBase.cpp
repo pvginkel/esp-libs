@@ -297,6 +297,13 @@ void ApplicationBase::begin_after_initialization() {
     register_shutdown_notification();
 
     do_ready();
+
+    // Publish an explicit, non-retained ready notification. Unlike the retained
+    // `online` flag in the state topic, whose `online: false` counterpart is only
+    // delivered through the last will (and is therefore suppressed by the broker
+    // if we reconnect within the will delay), this is an unconditional signal that
+    // the device finished starting up.
+    _mqtt_connection.publish(_mqtt_connection.get_device_topic_prefix() + "ready", "true", QOS_MIN_ONE, false);
 }
 
 void ApplicationBase::register_shutdown_notification() {

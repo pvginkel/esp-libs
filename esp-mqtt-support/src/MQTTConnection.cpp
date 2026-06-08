@@ -18,10 +18,6 @@ LOG_TAG(MQTTConnection);
 
 #define LAST_WILL_MESSAGE "{\"online\": false}"
 
-#define QOS_MAX_ONE 0      // Send at most one.
-#define QOS_MIN_ONE 1      // Send at least one.
-#define QOS_EXACTLY_ONE 2  // Send exactly one.
-
 #define MAXIMUM_PACKET_SIZE 4096
 
 // Debug instrumentation for the QoS in-flight back-pressure. Deliberately uses

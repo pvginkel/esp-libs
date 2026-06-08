@@ -13,6 +13,10 @@
 #include "cJSON.h"
 #include "mqtt_client.h"
 
+#define QOS_MAX_ONE 0      // Send at most one.
+#define QOS_MIN_ONE 1      // Send at least one.
+#define QOS_EXACTLY_ONE 2  // Send exactly one.
+
 struct MQTTConnectionState {
     bool connected;
 };
@@ -119,10 +123,7 @@ public:
     void set_configuration(MQTTConfiguration configuration) { _configuration = configuration; }
     void begin();
     bool is_connected() { return _connected; }
-    // Builds a fully-qualified topic under this device's prefix, e.g.
-    // get_device_topic("diagnostics") -> "<prefix>/<device_id>/diagnostics".
-    // Valid only after begin() has run (the prefix is set there).
-    std::string get_device_topic(const std::string& suffix) const { return _topic_prefix + suffix; }
+    const std::string& get_device_topic_prefix() const { return _topic_prefix; }
     bool publish(const std::string& topic, const std::string& payload, int qos = 1, bool retain = false);
     void send_state();
     void send_state(cJSON* data);

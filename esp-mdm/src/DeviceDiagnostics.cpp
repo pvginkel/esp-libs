@@ -170,4 +170,4 @@ void DeviceDiagnostics::publish_state() {
     cJSON_free(json);
 }
 
-std::string DeviceDiagnostics::get_state_topic() { return _mqtt_connection.get_device_topic("diagnostics"); }
+std::string DeviceDiagnostics::get_state_topic() { return _mqtt_connection.get_device_topic_prefix() + "diagnostics"; }
