@@ -3,7 +3,7 @@ description: Status Led support for the ESP32
 url: https://github.com/pvginkel/esp-libs
 dependencies:
   idf: ">=5.3"
-  led_strip: "*"
+  led_strip: "3.0.3"
   esp-support:
     path: ../esp-support
 files:
