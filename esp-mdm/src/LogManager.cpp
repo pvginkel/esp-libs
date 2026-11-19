@@ -69,7 +69,7 @@ esp_err_t LogManager::begin() {
     xTaskCreatePinnedToCore([](void* arg) { ((LogManager*)arg)->task_loop(); }, "log_manager",
                             CONFIG_MDM_LOG_TASK_STACK_SIZE, this, 1, &_task_handle, CONFIG_MDM_LOG_TASK_CORE_ID);
 
-    esp_register_shutdown_handler([]() {
+    const auto err = esp_register_shutdown_handler([]() {
         if (_instance) {
             ESP_LOGI(TAG, "Flushing log messages before restart");
 
@@ -88,6 +88,9 @@ esp_err_t LogManager::begin() {
             }
         }
     });
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Cannot register the shutdown handler: %s", esp_err_to_name(err));
+    }
 
     return ESP_OK;
 }

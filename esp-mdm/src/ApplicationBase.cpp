@@ -307,11 +307,14 @@ void ApplicationBase::begin_after_initialization() {
 }
 
 void ApplicationBase::register_shutdown_notification() {
-    esp_register_shutdown_handler([]() {
+    const auto err = esp_register_shutdown_handler([]() {
         ESP_LOGI(TAG, "Shutdown initiated");
 
         _shutdown_initiated = true;
     });
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Cannot register the shutdown handler: %s", esp_err_to_name(err));
+    }
 }
 
 void ApplicationBase::setup_mqtt_subscriptions() {
