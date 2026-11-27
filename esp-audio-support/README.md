@@ -17,12 +17,30 @@ natively:
 The ESP-IDF side is in `src/`, with its headers in `src/include/`:
 
 - `I2SOutput`: the I2S channel, TX only, on its own task.
-- `AudioPlayer`: the stream buffer and a tone, through the volume, out on an `I2SOutput`.
+- `UDPReceiver`: a UDP port on its own task, each datagram handed on with its sender.
+- `AudioPlayer`: the stream buffer and a tone, through the volume, out on an `I2SOutput`, with the
+  stream in on a `UDPReceiver` once `listen()` opens it.
 
-Nothing opens the UDP port yet. A receiver hands its packets to `AudioPlayer::push`.
+`sdkconfig.defaults` holds two lwIP settings the stream needs. A firmware that uses the component
+lists it in its `SDKCONFIG_DEFAULTS`. An existing `sdkconfig` keeps its old values, so delete it once
+to take them.
 
-`sdkconfig.defaults` raises lwIP's UDP receive queue to 32 datagrams. A firmware that uses the
-component lists it in its `SDKCONFIG_DEFAULTS`.
+- The UDP receive queue holds 32 datagrams, not 6, so a burst does not overflow it (Intercom's
+  finding H5).
+- IPv4 reassembly is on. A sender on a path with an MTU under 1500 sends a 1472-byte datagram in
+  two fragments, and lwIP drops fragments without it. A KubeCoder pod's MTU is 1430.
+
+## The wire
+
+Each datagram is a 4-byte big-endian counter, then 16-bit little-endian PCM, at most 1472 bytes in
+all. The counter goes up by one a packet.
+
+A sender keeps its packets one length. The stream buffer places a lost or late packet where the
+stream's mean packet puts it, and cuts a late packet that is longer than that place. With packets of
+one length the place is exact. Packets of two lengths, such as 1468 and 452 bytes for each 20 ms at
+48 kHz, also tend to arrive out of order: from a KubeCoder pod, most short ones came before the long
+one sent ahead of them. Each such long packet then lost a third of itself, and the stream ran dry
+every half second. Two packets of 960 bytes play clean.
 
 ## `StreamBufferConfig`
 
@@ -65,8 +83,17 @@ buffer, the tone and the volume against the output's task.
 - `play_tone(frequency_hz, duration_ms, level, count, pause_ms)`: bursts of a sine, `level` of full
   scale before the volume. It replaces a tone that still plays.
 - `push(source, packet, length)`: a stream's packet into the stream buffer.
+- `listen(port)`: opens the UDP port on a `UDPReceiver` and pushes each datagram, its source the
+  sender's IPv4 address and port. Call it once the network is up. It turns Wi-Fi modem power save
+  off first, for good: with it on, the access point holds the packets until the next beacon, and
+  they come in bursts with gaps of 100 to 300 ms (Intercom's finding H1).
 - `is_playing()` and `get_stats()`: the stream buffer's counters, how far it reaches ahead, and the
-  output's counters.
+  output's and the receiver's counters.
+
+The stream's first packet starts the output, and the output stops once the stream has run dry and
+waited out its grace. The log has a line for each stream's start, with its sender and first counter,
+and for its end, with what it counted from start to end. An underrun logs a warning, at most one in
+10 s, with the count since the last.
 
 ### `AudioPlayerConfig`
 
@@ -78,11 +105,11 @@ buffer, the tone and the volume against the output's task.
 | `sample_rate_hz` | 48000 | The stream's rate, and the output's. |
 | `depth_ms`, `lead_ms`, `grace_ms` | 1000, 200, 500 | The stream buffer's, as `StreamBufferConfig` has them. |
 | `buffer_in_psram` | false | Whether the ring goes in PSRAM rather than internal RAM. |
-| `udp_port` | 11106 | The port the stream comes in on, Intercom's. Nothing opens it yet. |
 | `volume` | 1 | The volume it starts at. |
 | `min_db`, `max_db` | -40, 0 | The range in dB that the volume maps onto. |
 | `auto_volume`, `auto_volume_target_db` | false, -18 | `AutoVolume` on the stream, and its target. |
 | `task_priority`, `task_core` | 7, no affinity | The output's task. |
+| `receiver_task_priority`, `receiver_task_core` | 8, no affinity | The receiver's task, above the output's, so a burst of packets drains from lwIP's queue before it overflows (Intercom's finding H5). |
 
 ## `I2SOutput`
 
@@ -114,6 +141,18 @@ output's task:
 
 It replaces Intercom's `feed_reference_samples` and `reset_feed_buffer`, for its echo canceller's
 reference.
+
+## `UDPReceiver`
+
+`UDPReceiver::begin(config, handler)` starts a task that binds the port on every IPv4 interface and
+blocks on it. Each datagram goes to the handler, on the receiver's task, with its sender's address.
+A datagram longer than 1472 bytes is cut to that. A socket that fails to open, to bind or to receive
+closes and opens again a second later, and counts an error in `get_stats()`.
+
+| Field | Default | What it is |
+|---|---|---|
+| `port` | 11106 | The port, Intercom's. |
+| `task_priority`, `task_core` | 8, no affinity | Its task, 4 KB of stack. |
 
 ## Tests
 

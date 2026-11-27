@@ -4,3 +4,10 @@
 # short stall of the receiving task, or a burst from the access point, overflows the queue and
 # lwIP drops the rest without a word. 32 costs a few hundred bytes.
 CONFIG_LWIP_UDP_RECVMBOX_SIZE=32
+
+# IPv4 reassembly. A stream's datagrams run up to 1472 bytes, a 1500-byte IP packet. A sender on a
+# path with a smaller MTU sends each one in two fragments, and lwIP drops a fragment unless it
+# reassembles. A KubeCoder pod's interface has an MTU of 1430, so from there a stream of 1468- and
+# 452-byte packets loses every long one without it. The reassembly holds at most 10 pbufs
+# (CONFIG_LWIP_IP_REASS_MAX_PBUFS).
+CONFIG_LWIP_IP4_REASSEMBLY=y
