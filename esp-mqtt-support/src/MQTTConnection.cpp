@@ -554,7 +554,7 @@ void MQTTConnection::send_state() {
 }
 
 void MQTTConnection::send_state(cJSON* data) {
-    ESP_LOGI(TAG, "Publishing new state");
+    ESP_LOGD(TAG, "Publishing new state");
 
     ESP_ASSERT_CHECK(_client);
 
