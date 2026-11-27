@@ -44,7 +44,7 @@ esp_err_t MDMConfiguration::load() {
     ESP_LOGI(TAG, "  base_url: %s", _base_url.c_str());
     ESP_LOGI(TAG, "  mqtt_url: %s", _mqtt_url.c_str());
     ESP_LOGI(TAG, "  wifi_ssid: %s", _wifi_ssid.c_str());
-    ESP_LOGI(TAG, "  wifi_password: %s", _wifi_password.c_str());
+    ESP_LOGI(TAG, "  wifi_password: ***");
 
     if (!_base_url.ends_with('/')) {
         _base_url += '/';
