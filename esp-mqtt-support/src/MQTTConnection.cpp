@@ -336,7 +336,7 @@ void MQTTConnection::publish_button_discovery(MQTTDiscovery metadata, std::funct
             if (data == "true") {
                 command_func();
             } else {
-                ESP_LOGW(TAG, "Invalid button press payload '%s'", data);
+                ESP_LOGW(TAG, "Invalid button press payload '%s'", data.c_str());
             }
         });
     });
