@@ -1,0 +1,6 @@
+# lwIP
+
+# A UDP socket queues 6 datagrams by default. A stream at 48 kHz brings about 65 a second, so a
+# short stall of the receiving task, or a burst from the access point, overflows the queue and
+# lwIP drops the rest without a word. 32 costs a few hundred bytes.
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=32
